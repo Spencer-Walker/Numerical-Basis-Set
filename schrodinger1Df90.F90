@@ -138,20 +138,20 @@ subroutine Get_error( num_points, R0, im, yl, yr, error)
    ! Output
    real(dp),  intent(out) :: error
    ! Derived
-   real(dp) :: h, dy
+   real(dp) :: h, Dy
 
    ! Computes the distance between neighboring pts 
    h = R0/dble(num_points+1)
 
    ! Compute log error
-   error =(dy(yl,im,num_points)/yl(im)-dy(yr,im,num_points)/yr(im))/h
+   error =(Dy(yl,im,num_points)/yl(im)-Dy(yr,im,num_points)/yr(im))/h
 
 end subroutine Get_error
 
 !--------------------------------------------------------------------------
-! dy
+! Dy
 !--------------------------------------------------------------------------
-function dy( y, im, num_points)
+function Dy( y, im, num_points)
    ! Finds the difference of y between points near im 
    implicit none
    integer, parameter :: dp = kind(0.d0) ! double precision
@@ -159,11 +159,11 @@ function dy( y, im, num_points)
    integer,  intent(in) :: num_points, im
    real(dp), dimension(0:num_points+1), intent(in) :: y
    ! Output
-   real(dp) :: dy
+   real(dp) :: Dy
 
    ! Computes the difference
-   dy = (y(im+1)-y(im-1))/2d0
-end function dy
+   Dy = (y(im+1)-y(im-1))/2d0
+end function Dy
 
 !--------------------------------------------------------------------------
 ! Match_and_normalize
@@ -315,7 +315,7 @@ end subroutine Itterate
 !--------------------------------------------------------------------------
 ! Get_bounds
 !--------------------------------------------------------------------------
-subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, DE, &
+subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
    &  Emin, Emax, min, max)
    ! This subroutine finds an upper and lower bound for possible energies
    ! which yield the correct number of nodes n-l-1 for the wfns
@@ -323,7 +323,7 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, DE, &
    integer, parameter :: dp = kind(0.d0) ! double precision
    ! Input
    integer,   intent(in)  :: n, l, num_points, im
-   real(dp),  intent(in)  :: R0, Rm, DE
+   real(dp),  intent(in)  :: R0, Rm, dE
    real(dp),  dimension(0:num_points+1) ::r, V, yl, yr
    ! Output
    real(dp),  intent(out) :: Emin, Emax, min, max
@@ -338,7 +338,7 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, DE, &
 
    ! Decrease Emin till an appropriate number of nodes are formed
    do while(num_nodes>nodes)
-      Emin = Emin-dsqrt(DE)
+      Emin = Emin-dsqrt(dE)
       call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
       &  num_nodes, min)
 
@@ -346,28 +346,28 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, DE, &
 
    ! Increase Emin till an appropriate number of nodes are formed
    do while(num_nodes<nodes)
-      Emin = Emin+dsqrt(DE)
+      Emin = Emin+dsqrt(dE)
       call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
       &  num_nodes, min)
 
    end do
 
    do while(num_nodes>nodes)
-      Emin = Emin-DE
+      Emin = Emin-dE
       call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
       &  num_nodes, min)
 
    end do
 
    ! Decrease Emin until the bottom of the appropiate doMain is found
-   if (Emin <-0.5d0-DE) then
-      Emin = -0.5d0-DE
+   if (Emin <-0.5d0-dE) then
+      Emin = -0.5d0-dE
    end if
 
    Eold = Emin
    do while(num_nodes == nodes .and. Emin>-0.51d0)
       Eold = Emin
-      Emin = Emin-DE
+      Emin = Emin-dE
 
       call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
       &  num_nodes, min)
@@ -380,13 +380,13 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, DE, &
    &  min)
 
    ! Finds the appropriate bound for Emax
-   Emax = Emin+DE
+   Emax = Emin+dE
    call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr, num_nodes,&
    &  max)
 
    ! Increase Emax until the node constraint is satsified
    do while(num_nodes<nodes+1)
-      Emax = Emax+dsqrt(DE)
+      Emax = Emax+dsqrt(dE)
       call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr,  &
       &  num_nodes, max)
 
@@ -394,7 +394,7 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, DE, &
 
    ! Decrease Emax until the node constraint is satsified
    do while(num_nodes>nodes)
-      Emax = Emax-DE
+      Emax = Emax-dE
       call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr,  &
       &  num_nodes, max)
 
@@ -404,7 +404,7 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, DE, &
    Eold = Emax
    do while(num_nodes == nodes .and. Emax < 15)
       Eold = Emax
-      Emax = Emax+DE
+      Emax = Emax+dE
       call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr,  &
       &  num_nodes, max)
 
@@ -435,7 +435,7 @@ subroutine Get_correction( yl, yr, num_points, im, R0, E1)
    ! Output
    real(dp),   intent(out) :: E1
    ! Derived
-   real(dp)                :: Il, Ir, dvl, dvr, dy, h
+   real(dp)                :: Il, Ir, dvl, dvr, Dy, h
    real(dp),   dimension(0:num_points+1) :: vl, vr
 
    ! Get gridspacing
@@ -451,8 +451,8 @@ subroutine Get_correction( yl, yr, num_points, im, R0, E1)
    Ir = sum(vr(im:num_points)**2)*h
 
    ! Normalized derivatives
-   dvl = dy(vl,im,num_points)
-   dvr = dy(vr,im,num_points)
+   dvl = Dy(vl,im,num_points)
+   dvr = Dy(vr,im,num_points)
 
    ! Compute the energy update
    ! (given in Hartree's atomic structure text )
@@ -464,7 +464,7 @@ end subroutine Get_correction
 ! Refine
 !--------------------------------------------------------------------------
 subroutine Refine( n, l, num_points, R0, r, V, E, tol, y, error)
-   ! Once the energy is in some neighborhood ΔE of the "exact" energy
+   ! Once the energy is in some neighborhood dE of the "exact" energy
    ! we are allowed to treat the left and right wfns as variations of
    ! eachother, and are able to iteratively compute better energy estimates
    implicit none
@@ -516,7 +516,7 @@ end subroutine Refine
 !--------------------------------------------------------------------------
 ! Search
 !--------------------------------------------------------------------------
-subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, DE, tol, y, E)
+subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
    ! We search for the radial wavefunctions and energy by first using
    ! bisection to get a rough estimate and then use variations of the
    ! left and right wfns to compute additional refinements
@@ -524,7 +524,7 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, DE, tol, y, E)
    integer, parameter :: dp = kind(0.d0) ! double precision
    ! Input
    integer,    intent(in)  :: n, l, num_points, Znuc
-   real(dp),   intent(in)  :: DE, R0, tol
+   real(dp),   intent(in)  :: dE, R0, tol
    ! Outout
    real(dp),   intent(out) :: E
    real(dp),   intent(out) :: y(0:num_points+1)
@@ -545,7 +545,7 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, DE, tol, y, E)
    call Init_pot(num_points,l, Znuc, r,V)
 
    ! Find appropriate bounds for the energy for the binary Search
-   call Get_bounds(n,l,num_points,R0,Rm,im,r,V,yl,yr,DE,Emin,Emax,min,max)
+   call Get_bounds(n,l,num_points,R0,Rm,im,r,V,yl,yr,dE,Emin,Emax,min,max)
 
    ! We will use a binary search to find an energy estimate here we chose 
    ! the bounds + range + midpoint of the binary search method 
@@ -556,16 +556,16 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, DE, tol, y, E)
 
    ! We will keep bisecting some energy interval until the range used 
    ! for the search is under some tolerance
-   do while( range > DE )
+   do while( range > dE )
       ! Look at an energy higher than E 
-      call Itterate( l, num_points, R0, Rm, im, E+DE, r, V, yl, yr,  &
+      call Itterate( l, num_points, R0, Rm, im, E+dE, r, V, yl, yr,  &
       &  num_nodes, right)
 
       ! Look at an energy less than E
-      call Itterate( l, num_points, R0, Rm, im, E-DE, r, V, yl, yr,  &
+      call Itterate( l, num_points, R0, Rm, im, E-dE, r, V, yl, yr,  &
       &  num_nodes, left)
 
-      ! If once Energy E+/-DE produces wfns that match better split the
+      ! If once Energy E+/-dE produces wfns that match better split the
       ! domain in half 
       if(abs(right)>abs(left)) then
          finish  = E
@@ -809,7 +809,7 @@ end subroutine Process_vec
 !--------------------------------------------------------------------------
 ! Process_vec
 !--------------------------------------------------------------------------
-subroutine Get_basis( h, R00, nmax, lmax, Rmax, DE, tol, Emax, Emin, Znuc, &
+subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
    &  proc_id, num_proc, ener_dset, psi_dset, h5_err)
    use hdf5
    use mpi
@@ -817,7 +817,7 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, DE, tol, Emax, Emin, Znuc, &
    integer, parameter   :: dp = kind(0.d0) ! double precision
    ! Input
    integer,  intent(in) :: nmax, lmax, Znuc, proc_id, num_proc
-   real(dp), intent(in) :: h, R00, Rmax, DE, tol
+   real(dp), intent(in) :: h, R00, Rmax, dE, tol
    integer(HID_T), dimension(0:lmax) :: ener_dset, psi_dset
    ! Output
    integer :: h5_err
@@ -872,7 +872,7 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, DE, tol, Emax, Emin, Znuc, &
          allocate( y(0:num_points+1))
 
          ! Search for the correct n,l eigenfunction
-         call Search( n, l, Znuc, num_points, R0, Emin, Emax, DE, tol, y,  &
+         call Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y,  &
          &  E(n-l))
          
          ! Print information about each n,l computed 
@@ -881,7 +881,7 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, DE, tol, Emax, Emin, Znuc, &
          
          ! Use old calculation for new energy estimates
          Eold = Emin
-         Emin = Emax + DE
+         Emin = Emax + dE
          Emax = Emax + ( Emax-Eold)
 
          ! Orthogonalize y and add it to u 
@@ -919,7 +919,7 @@ program Main
    ! Declarations
    integer, parameter    :: dp = kind(0.d0) ! double precision
    integer               :: lmax, nmax, Znuc
-   real(dp)              :: R00, DE, Emin, Emax, tol, h, Rmax
+   real(dp)              :: R00, dE, Emin, Emax, tol, h, Rmax
    integer :: num_proc, mpi_err, proc_id
    character(len = 15)   :: label
    integer(HID_T) :: file_id
@@ -933,7 +933,7 @@ program Main
    R00   = 30.d0     ! Box size for the ground state
    nmax  = 10        ! Highest energy level computed 
    Rmax  = 1000.d0   ! Maximum possible box size
-   DE    = 1d-5      ! Energy tolerance for the binary search
+   dE    = 1d-5      ! Energy tolerance for the binary search
    tol   = 1d-14     ! Error tolerance for the refinement stage 
    lmax  = 2         ! Maximum possible angular momentum
    Emax  = 100.d0    ! Maximum possible energy (for finding bounds)
@@ -983,7 +983,7 @@ program Main
 
    ! Generates the basis + energy for this system and writes it to 
    ! label.h5
-   call Get_basis( h, R00, nmax, lmax, Rmax, DE, tol, Emax, Emin, Znuc, &
+   call Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
    &  proc_id, num_proc, ener_dset, psi_dset, h5_err)
 
    ! Prints when proc_id #proc_id has finished the above step 
