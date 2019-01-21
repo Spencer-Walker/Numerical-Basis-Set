@@ -42,6 +42,5 @@ propagatef90: propagatef90.o chkopts
 	-${FLINKER} -o propagatef90 propagatef90.o ${SLEPC_EPS_LIB}
 	-${RM} propagatef90.o
 
-
 #------------------------------------------------------------------------------------
 DATAPATH = ${SLEPC_DIR}/share/slepc/datafiles/matrices

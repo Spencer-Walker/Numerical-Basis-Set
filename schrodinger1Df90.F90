@@ -529,11 +529,12 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
    real(dp),   intent(out) :: E
    real(dp),   intent(out) :: y(0:num_points+1)
    ! Derived
-   real(dp) :: Rm,error,start,finish,range,left,right,Emin,Emax,min,max
-   real(dp),   dimension(0:num_points+1) :: yl,yr,r,V
-   integer  :: im,nodes,num_nodes
+   real(dp) :: Rm, error, start, finish, range, left, right, Emin, Emax
+   real(dp) :: min, max
+   real(dp),   dimension(0:num_points+1) :: yl, yr, r, V
+   integer  :: im, nodes, num_nodes
    ! External
-   external  :: Init_mesh,Init_pot,Itterate,Match_and_normalize
+   external  :: Init_mesh, Init_pot, Itterate, Match_and_normalize
    
    ! Compute the number of nodes that the n,l wfn must have
    nodes = n-l-1
@@ -916,6 +917,7 @@ program Main
    use mpi
    use hdf5
    implicit none
+
    ! Declarations
    integer, parameter    :: dp = kind(0.d0) ! double precision
    integer               :: lmax, nmax, Znuc
