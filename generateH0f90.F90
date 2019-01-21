@@ -11,11 +11,11 @@ program main
 ! --------------------------------------------------------------------------
   PetscErrorCode      :: ierr
   Mat                 :: H0
-  PetscInt            :: i_start,i_end
+  PetscInt            :: i_start, i_end
   PetscViewer         :: viewer
   PetscMPIInt         :: rank 
-  PetscInt            :: one,size1,size2,i
-  integer             :: l,n,n_max,l_max,size,index
+  PetscInt            :: one, size1, size2, i
+  integer             :: l, n, n_max, l_max, size, index, h5_err
   character(len = 3)  :: file! file number
   character(len = 6)  :: fmt ! format descriptor
   character(len = 24) :: file_name
@@ -39,10 +39,16 @@ program main
   endif 
  
   call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
-  if (ierr .ne. 0) then
+  if ( ierr /= 0 ) then
      print*,'SlepcInitialize failed'
      stop
   endif
+
+  call h5open_f( h5_err)
+  if ( h5_err /= 0 ) then
+    print*,'h5open_f failed'
+  end if
+
 
   call MPI_Comm_rank(MPI_COMM_WORLD,rank,ierr);CHKERRA(ierr)
 
