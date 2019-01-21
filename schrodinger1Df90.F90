@@ -624,31 +624,31 @@ subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space,    &
    info = MPI_INFO_NULL
 
    ! Initialize mpi
-   call MPI_INIT( mpi_err)
+   call MPI_Init( mpi_err)
    
    ! Find how many workers are available 
-   call MPI_COMM_SIZE( comm, num_proc, mpi_err)
+   call MPI_Comm_size( comm, num_proc, mpi_err)
 
    ! Figure out what the worker id is 
-   call MPI_COMM_RANK( comm, proc_id, mpi_err)
+   call MPI_Comm_rank( comm, proc_id, mpi_err)
 
    ! Initialize hdf5 
-   call H5OPEN_F( h5_err)
+   call h5open_f( h5_err)
 
    ! Creates the hdf5 property list that will be used for the file 
    ! (like an interface or c template)
-   call H5PCREATE_F( H5P_FILE_ACCESS_F, plist_id, h5_err)
+   call h5pcreate_f( H5P_FILE_ACCESS_F, plist_id, h5_err)
 
    ! Stores MPI IO communicator information to the file access property 
    ! list. 
-   call H5PSET_FAPL_MPIO_F( plist_id, comm, info, h5_err)
+   call h5pset_fapl_mpio_f( plist_id, comm, info, h5_err)
 
    ! Create the hdf5 file with the property list and parallel acess
-   call H5FCREATE_F( file_name, H5F_ACC_TRUNC_F, file_id, h5_err,  &
+   call h5fcreate_f( file_name, H5F_ACC_TRUNC_F, file_id, h5_err,  &
    &  access_prp = plist_id)
 
    ! Converts fortran real(dp) kind to mpi real numbers
-   h5_kind = H5KIND_TO_TYPE( dp, H5_REAL_KIND)
+   h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
 
    ! Iterate over all l and create a file for each energy and wfn
    do l = 0, lmax
@@ -673,15 +673,15 @@ subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space,    &
       psi_dims(2) = nmax-l
 
       ! Creates an hdf5 interface that knows information about the data
-      call H5SCREATE_SIMPLE_F( 1, ener_dims, ener_space(l), h5_err)
+      call h5screate_simple_f( 1, ener_dims, ener_space(l), h5_err)
       
       ! Connects the datasapce to the hdf5 file and gives it a name 
-      call H5DCREATE_F( file_id, "Energy_l"//trim(strl), h5_kind, ener_space(l), &
+      call h5dcreate_f( file_id, "Energy_l"//trim(strl), h5_kind, ener_space(l), &
       &  ener_dset(l), h5_err)
 
       ! Does the same as before for the energy but with the wfns 
-      call H5SCREATE_SIMPLE_F( 2, psi_dims, psi_space(l), h5_err)
-      call H5DCREATE_F( file_id, "Psi_l"//trim(strl), h5_kind, psi_space(l), &
+      call h5screate_simple_f( 2, psi_dims, psi_space(l), h5_err)
+      call h5dcreate_f( file_id, "Psi_l"//trim(strl), h5_kind, psi_space(l), &
       &  psi_dset(l), h5_err)
 
    end do 
@@ -710,24 +710,24 @@ subroutine Finalize( lmax, file_id, ener_space, ener_dset,   &
    ! For each l close the hdf5 objects that were created in initialize
    do l = 0, lmax
       ! Closes the energy dataset
-      call H5DCLOSE_F( ener_dset(l), h5_err)
+      call h5dclose_f( ener_dset(l), h5_err)
       
       ! Closes the energy dataspace
-      call H5SCLOSE_F( ener_space(l), h5_err)
+      call h5sclose_f( ener_space(l), h5_err)
 
       ! Closes the psi dataset
-      call H5DCLOSE_F( psi_dset(l), h5_err)
+      call h5dclose_f( psi_dset(l), h5_err)
       
       ! Closes the psi dataspace
-      call H5SCLOSE_F( psi_space(l), h5_err)
+      call h5sclose_f( psi_space(l), h5_err)
       
    end do 
    
    ! Closes the hdf5 file
-   call H5FCLOSE_F( file_id, h5_err)
+   call h5fclose_f( file_id, h5_err)
 
    ! Closes all mpi 
-   call MPI_FINALIZE( mpi_err)
+   call MPI_Finalize( mpi_err)
 
 end subroutine Finalize
 
@@ -759,7 +759,7 @@ subroutine Save_spectrum(l, nmax, lmax, Rmax, h, u, E, ener_dset, psi_dset,&
    print 10, 'writing ', l
 
    ! Converts fortran dp kind to mpi real type
-   h5_kind = H5KIND_TO_TYPE( dp, H5_REAL_KIND)
+   h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
 
    ! There will be nmax-l eigenstates for each l 
    ener_dims(1) = nmax-l
@@ -769,10 +769,10 @@ subroutine Save_spectrum(l, nmax, lmax, Rmax, h, u, E, ener_dset, psi_dset,&
    psi_dims(2) = nmax-l
    
    ! Writes E to Energy_l#l (l#l can be l0, l1, ... etc ) 
-   call H5DWRITE_F( ener_dset(l), h5_kind, E, ener_dims, h5_err)
+   call h5dwrite_f( ener_dset(l), h5_kind, E, ener_dims, h5_err)
    
    ! Writes u to Psi_l#l
-   call H5DWRITE_F( psi_dset(l), h5_kind, u, psi_dims, h5_err)
+   call h5dwrite_f( psi_dset(l), h5_kind, u, psi_dims, h5_err)
 
 end subroutine Save_spectrum
 
@@ -838,7 +838,7 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
    if (proc_id == 0) then
       print 10,'-----------------------------------------------'      
    end if 
-   call MPI_BARRIER( MPI_COMM_WORLD, mpi_err)
+   call MPI_Barrier( MPI_COMM_WORLD, mpi_err)
 
 
    ! The lmax+1 angular momentum blocks are split up between the 
@@ -902,7 +902,7 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
       deallocate( E)
 
    end do 
-   call MPI_BARRIER( MPI_COMM_WORLD, mpi_err)
+   call MPI_Barrier( MPI_COMM_WORLD, mpi_err)
 
    ! Bottom of n,l table 
    if (proc_id == 0) then
@@ -978,7 +978,7 @@ program Main
    ! I stop all workers until all hdf5 objects are created this probably 
    ! isnt needed but is safer regardless, and garentees that the print 
    ! statement above is printed first 
-   call MPI_BARRIER( MPI_COMM_WORLD, mpi_err)
+   call MPI_Barrier( MPI_COMM_WORLD, mpi_err)
 
    ! Prints that proc_id #proc_id has been initialized properly
    print 20, 'start   ', proc_id
