@@ -222,8 +222,8 @@ program main
 
   ! We now save the complete Z matrix to a binary file on the disk
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-    & trim(label)//"_dipoleAccelerationMatrix.bin",FILE_MODE_WRITE,view_l1,ierr);&
-    CHKERRA(ierr)
+  & trim(label)//"_dipoleAccelerationMatrix.bin",FILE_MODE_WRITE,view_l1,ierr);&
+  CHKERRA(ierr)
   call MatView(Z,view_l1,ierr)
   CHKERRA(ierr)
   call MatDestroy(ZH,ierr)

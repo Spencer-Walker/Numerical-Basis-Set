@@ -34,5 +34,5 @@ module simulation_parametersf90
   PetscScalar, parameter :: two = 2.d0
   PetscScalar, parameter :: one = 1.d0
   PetscScalar, parameter :: zero = 0.d0
-  real(dp), parameter :: pi = 3.1415926535897932384626433832795028841971693993
+  real(dp), parameter :: pi = 3.141592653589793238462643383279502884197169
 end module simulation_parametersf90
