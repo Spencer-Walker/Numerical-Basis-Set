@@ -1,9 +1,23 @@
-! We generate a basis for the field free schrodinger equation using the
-! Numerov method.
+!------------------------------------------------------------------------------
+! CU Boulder, Jila
+!------------------------------------------------------------------------------
+!
+! PROGRAM:  schrodinger1Df90.F90
+!
+!> Spencer.Walker@colorado.edu
+!> Spencer Walker
+!
+! DESCRIPTION: 
+!>  This program generates the basis for numerov method and writes it to an .h5
+!   file.
+!
+! REVISION HISTORY:
+! 22 01 2019 - Initial Version
+!------------------------------------------------------------------------------
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Gram_schmidt
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Gram_schmidt( n, l, nmax, length, u)
   ! This subroutine orthogonalizes the set of eigenfunctions produced
   ! from this program.
@@ -28,9 +42,9 @@ subroutine Gram_schmidt( n, l, nmax, length, u)
 
 end subroutine Gram_schmidt
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Init_mesh
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Init_mesh( num_points, R0, r)
   ! This subroutine initializes a uniformly spaced mesh with num_points
   ! between 0 and R0.
@@ -55,9 +69,9 @@ subroutine Init_mesh( num_points, R0, r)
 
 end subroutine Init_mesh
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Init_pot
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Init_pot( num_points, l, Znuc, r, V)
   ! This subroutine initializes the effective potential for the radial
   ! schrodinger equation for hydrogen.
@@ -89,9 +103,9 @@ subroutine Init_pot( num_points, l, Znuc, r, V)
 
 end subroutine Init_pot
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Turning_pt
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Turning_pt( num_points, r, l, E, Rm, im)
   ! Finds the classical turning point 
   ! This point will be used to match the left and right wfns 
@@ -123,9 +137,9 @@ subroutine Turning_pt( num_points, r, l, E, Rm, im)
 
 end subroutine Turning_pt
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Get_error
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Get_error( num_points, R0, im, yl, yr, error)
   !This function computes the logarithmic error between the two wfns
   !error = ( d (log u) - d (log v) )/h
@@ -148,9 +162,9 @@ subroutine Get_error( num_points, R0, im, yl, yr, error)
 
 end subroutine Get_error
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Dy
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 function Dy( y, im, num_points)
   ! Finds the difference of y between points near im 
   implicit none
@@ -165,9 +179,9 @@ function Dy( y, im, num_points)
   Dy = (y(im+1)-y(im-1))/2d0
 end function Dy
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Match_and_normalize
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Match_and_normalize( num_points, im, yl, yr, y)
   ! Matches the left and right wfns and normalizes the overall wfn y
   implicit none
@@ -195,9 +209,9 @@ subroutine Match_and_normalize( num_points, im, yl, yr, y)
 
 end subroutine Match_and_normalize
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Itterate
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
   & num_nodes, error)
   ! This subroutine (1) finds the classical (call) turning pt for given
@@ -312,9 +326,9 @@ subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
 
 end subroutine Itterate
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Get_bounds
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
   & Emin, Emax, min, max)
   ! This subroutine finds an upper and lower bound for possible energies
@@ -419,9 +433,9 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
 
 end subroutine Get_bounds
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Get_correction
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Get_correction( yl, yr, num_points, im, R0, E1)
   ! We compute energy corrections by taking variations of the
   ! logarithm of the left and right wfns and matching them at
@@ -460,9 +474,9 @@ subroutine Get_correction( yl, yr, num_points, im, R0, E1)
 
 end subroutine Get_correction
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Refine
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Refine( n, l, num_points, R0, r, V, E, tol, y, error)
   ! Once the energy is in some neighborhood dE of the "exact" energy
   ! we are allowed to treat the left and right wfns as variations of
@@ -513,9 +527,9 @@ subroutine Refine( n, l, num_points, R0, r, V, E, tol, y, error)
 
 end subroutine Refine
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Search
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
   ! We search for the radial wavefunctions and energy by first using
   ! bisection to get a rough estimate and then use variations of the
@@ -587,9 +601,9 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
 
 end subroutine Search
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Initialize
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space, &
   & ener_dset, psi_space, psi_dset, h5_err, num_proc, proc_id,  mpi_err)
   ! Starts mpi + hdf5 and also makes the hdf5 file and structure that will 
@@ -688,9 +702,9 @@ subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space, &
 
 end subroutine Initialize
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Finalize
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Finalize( lmax, file_id, ener_space, ener_dset, &
   & psi_space, psi_dset, h5_err, mpi_err)
   ! Closes all hdf5 and mpi objects 
@@ -731,9 +745,9 @@ subroutine Finalize( lmax, file_id, ener_space, ener_dset, &
 
 end subroutine Finalize
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Save_spectrum
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Save_spectrum(l, nmax, lmax, Rmax, h, u, E, ener_dset, psi_dset,&
   & h5_err)
   ! Saves all of the data for each angular momentum block 
@@ -776,9 +790,9 @@ subroutine Save_spectrum(l, nmax, lmax, Rmax, h, u, E, ener_dset, psi_dset,&
 
 end subroutine Save_spectrum
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Process_vec
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine Process_vec( n, l, nmax, num_points, Rmax, h, y, u)
   ! As each new energy En is computed the wfn yn is orthogonalized and 
   ! added to the matrix u 
@@ -807,10 +821,10 @@ subroutine Process_vec( n, l, nmax, num_points, Rmax, h, y, u)
 
 end subroutine Process_vec
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Process_vec
-!--------------------------------------------------------------------------
-subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
+!------------------------------------------------------------------------------
+subroutine Get_basis( h, Rmin, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
   & proc_id, num_proc, ener_dset, psi_dset, h5_err)
   use hdf5
   use mpi
@@ -818,7 +832,7 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
   integer, parameter   :: dp = kind(0.d0) ! double precision
   ! Input
   integer,  intent(in) :: nmax, lmax, Znuc, proc_id, num_proc
-  real(dp), intent(in) :: h, R00, Rmax, dE, tol
+  real(dp), intent(in) :: h, Rmin, Rmax, dE, tol
   integer(HID_T), dimension(0:lmax) :: ener_dset, psi_dset
   ! Output
   integer :: h5_err
@@ -860,7 +874,7 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
     ! Iterate through allowed quantum numbers
     do n = l+1, nmax
       ! The num_proc of the grid increases for every energy level
-      R0 = R00*n**2.d0
+      R0 = Rmin*n**2.d0
       ! Truncate the doMain at some R0
       if ( R0 > Rmax) then
         R0 = Rmax
@@ -910,18 +924,17 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
   end if 
 end subroutine Get_basis
 
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Main
-!--------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 program Main
   use mpi
+  use simulation_parametersf90
   use hdf5
   implicit none
-
   ! Declarations
-  integer, parameter  :: dp = kind(0.d0) ! double precision
   integer             :: lmax, nmax, Znuc
-  real(dp)            :: R00, dE, Emin, Emax, tol, h, Rmax
+  real(dp)            :: Rmin, dE, Emin, Emax, tol, h, Rmax
   integer :: num_proc, mpi_err, proc_id
   character(len = 15) :: label
   integer(HID_T) :: file_id
@@ -929,19 +942,24 @@ program Main
   integer(HID_T), allocatable ::  psi_space(:), psi_dset(:)
   integer        :: h5_err
   external       :: search
+  real(dp)       :: start_time, end_time 
 
-  ! Parameters are set here for now. They will be set with a json file.
-  h     = 0.060d0   ! Distance between equally spaced nodes
-  R00   = 30.d0     ! Box size for the ground state
-  nmax  = 20        ! Highest energy level computed 
-  Rmax  = 1000.d0   ! Maximum possible box size
-  dE    = 1d-5      ! Energy tolerance for the binary search
-  tol   = 1d-14     ! Error tolerance for the refinement stage 
-  lmax  = 10        ! Maximum possible angular momentum
-  Emax  = 100.d0    ! Maximum possible energy (for finding bounds)
-  Emin  = -1.d0     ! Lower bound for the ground state 
-  Znuc  = 1         ! Nuclear charge (1 for hydrogen)
-  label = 'H_test'  ! Label used for when the hdf5 file is created
+
+  ! Start CPU time 
+  call CPU_TIME(start_time)
+
+  ! Parameters are set in simulation_parametersf90
+  h     = grid_space
+  Rmin  = R_min
+  nmax  = n_max
+  Rmax  = R_max
+  dE    = binary_search_tol
+  tol   = refinement_tol
+  lmax  = l_max
+  Emax  = E_max
+  Emin  = E_min
+  Znuc  = Z_nuc
+  label = hdf5_file_label
 
   ! If lmax is greater than nmax the program stops since these parameters 
   ! do not make any sense 
@@ -954,6 +972,7 @@ program Main
   ! Fomats for the terminal output 
   10 format(A47)
   20 format(A8,I4)
+  30 format(A8,ES9.2)
 
   ! Allocates memory for bothe energy and wavefunction space + dset 
   allocate( ener_space(0:lmax), ener_dset(0:lmax))
@@ -985,7 +1004,7 @@ program Main
 
   ! Generates the basis + energy for this system and writes it to 
   ! label.h5
-  call Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
+  call Get_basis( h, Rmin, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
   & proc_id, num_proc, ener_dset, psi_dset, h5_err)
 
   ! Prints when proc_id #proc_id has finished the above step 
@@ -1000,5 +1019,9 @@ program Main
 
   ! Deallocates all remaining varaibles in the program 
   deallocate( ener_space, ener_dset, psi_space, psi_dset)
+
+  call CPU_TIME(end_time)
+  
+  print 30, 'time   :', end_time-start_time
 
 end program Main

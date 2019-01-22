@@ -1,6 +1,7 @@
 ! This program generates the field free hamiltonion in energy basis
 program main
 use hdf5
+use simulation_parametersf90
 #include <slepc/finclude/slepceps.h>
 #include <petsc/finclude/petscdm.h>
 #include <petsc/finclude/petscdmda.h>
@@ -10,14 +11,13 @@ use hdf5
 ! --------------------------------------------------------------------------
 ! Declarations
 ! --------------------------------------------------------------------------
-  integer,  parameter  :: dp = kind(0.d0) ! double precision double precision
   PetscErrorCode      :: ierr
   Mat                 :: H0
   PetscInt            :: i_start, i_end
   integer(HID_T)      :: file_id, ener_id, h5_kind
   PetscViewer         :: viewer, hdf5v
   PetscMPIInt         :: proc_id, num_proc, comm 
-  PetscInt            :: one, i
+  PetscInt            :: i
   integer             :: l, n, nmax, lmax, size, index, h5_err
   character(len = 15) :: label ! File name without .h5 extension
   character(len = 3)  :: strl  ! file number (l converted to a string)
@@ -28,14 +28,18 @@ use hdf5
   PetscScalar         :: val(1)
   integer(HSIZE_T)    :: ener_dims(1:1)
   PetscReal, allocatable   :: E(:,:)
+  real(dp)  :: start_time, end_time 
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
-  comm             = MPI_COMM_WORLD
-  lmax             = 10
-  nmax             = 20
-  one              = 1
-  label =  'H_test'
+  call CPU_TIME(start_time)
+  
+  10 format(A8,ES9.2)
+
+  comm  = MPI_COMM_WORLD
+  lmax  = l_max
+  nmax  = n_max
+  label = hdf5_file_label 
 
   call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
   if ( ierr /= 0 ) then
@@ -155,4 +159,9 @@ use hdf5
   call h5fclose_f( file_id, h5_err)
   call h5close_f( h5_err)
   call SlepcFinalize(ierr)
+
+  call CPU_TIME(end_time)
+  
+  print 10, 'time   :', end_time-start_time
+
 end program main
