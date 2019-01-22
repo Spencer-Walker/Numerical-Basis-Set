@@ -111,7 +111,7 @@ use hdf5
 					index = (n - 1)*n/2 + l
 			else
 					index = (lmax + 1)*(lmax + 2)/2 + (n - lmax - 2)*(lmax + 1) &
-							+ l
+					&	+ l
 			endif    
 			
 			! Convert the real energy to a PetscScalar
@@ -134,7 +134,7 @@ use hdf5
   print*, size1,size2
   ! Write the matrix to a binary file
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-      &	"small_fieldFreeMatrix.bin",FILE_MODE_WRITE,viewer,ierr)
+  &	"small_fieldFreeMatrix.bin",FILE_MODE_WRITE,viewer,ierr)
   CHKERRA(ierr)
 	call MatView(H0,viewer,ierr)
 	CHKERRA(ierr)
