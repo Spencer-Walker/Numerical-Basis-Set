@@ -3,4 +3,5 @@ schrodinger1Df90
 *.bin*
 gnerateH1f90
 generateH0f90
+generateDipoleAccelerationf90
 makefile
