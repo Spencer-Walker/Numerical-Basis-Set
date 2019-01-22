@@ -28,10 +28,11 @@ use dipole
   PetscViewer     :: viewer
   PetscMPIInt     :: rank 
   PetscScalar     :: norm
-  integer         :: n_max,l_max,size,num_grid_points
+  integer         :: nmax,lmax,size,num_grid_points
   real(8)         :: pi
   PetscReal       :: E0,w,cep,T0,zero,one,intensity,wavelength,num_cycles,dt
   PetscReal       :: h,r0,max_time
+  character(len=15) :: label
   external        :: RHSMatrixSchrodinger
   common    /shared/ E0, w, cep, pi, T0
   parameter         (i_Z = 1, i_H0 = 2,i_A = 3)
@@ -46,18 +47,19 @@ use dipole
      stop
   endif
   failures        = -1
-  one             = 1
-  zero            = 0
+  one             = 1.d0
+  zero            = 0.d0
   pi              = 4.d0*datan(1.d0)
-  l_max           = 40
-  n_max           = 150
-  ! If n_max <= l_max+1 we chose the normal basis size but if it is large 
+  lmax            = 10
+  nmax            = 20
+  label           = 'H_test'
+  ! If nmax <= lmax+1 we chose the normal basis size but if it is large 
   ! the basis is truncated in l
-  if(n_max .le. l_max+1) then
-     size = (n_max - 1)*n_max/2 + l_max + 1
+  if(nmax .le. lmax+1) then
+     size = (nmax - 1)*nmax/2 + lmax + 1
   else
-     size = (l_max + 1)*(l_max + 2)/2 + (n_max - l_max - 2)*(l_max + 1) + &
-          l_max + 1
+     size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
+          lmax + 1
   endif
   print*,size
   h               = r0/num_grid_points 
@@ -83,7 +85,7 @@ use dipole
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-       'small_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr);&
+       trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr);&
        CHKERRA(ierr)
   call MatCreate(MPI_COMM_WORLD,user(i_Z),ierr);CHKERRA(ierr)
   call MatSetSizes(user(i_Z),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);&
@@ -100,7 +102,7 @@ use dipole
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-       'small_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr);&
+       trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr);&
        CHKERRA(ierr)
   call MatCreate(MPI_COMM_WORLD,user(i_A),ierr);CHKERRA(ierr)
   call MatSetSizes(user(i_A),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);&
@@ -119,7 +121,7 @@ use dipole
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-       'small_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr);&
+       trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr);&
        CHKERRA(ierr)
   call MatCreate(MPI_COMM_WORLD,user(i_H0),ierr);CHKERRA(ierr)
   call MatSetSizes(user(i_H0),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);&
@@ -194,20 +196,20 @@ use dipole
   ! Now we finally solve the system 
   call TSSolve(ts,psi,ierr);CHKERRA(ierr)
 
-  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,'small_psi.output',&
+  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_psi.output',&
        viewer,ierr);CHKERRA(ierr)
   call VecView(psi,viewer,ierr);CHKERRA(ierr)
 
   call VecAbs(psi,ierr);CHKERRA(ierr)
   call VecPointwiseMult(psi,psi,psi,ierr);CHKERRA(ierr)
-  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,'small_rho.output',&
+  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
        viewer,ierr);CHKERRA(ierr)
   call VecView(psi,viewer,ierr);CHKERRA(ierr)
   call VecSum(psi,norm,ierr);CHKERRA(ierr)
   print*,'Norm is',norm
 
 
-  open(10,file = 'small_dipoleAcceleration.output')
+  open(10,file = trim(label)//'_dipoleAcceleration.output')
   write(10,*) dipoleA(:)
   close(10)
   deallocate(dipoleA)
