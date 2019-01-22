@@ -43,8 +43,8 @@ use dipole
 
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
-     print*,'Unable to initialize PETSc'
-     stop
+    print*,'Unable to initialize PETSc'
+    stop
   endif
   failures        = -1
   one             = 1.d0
@@ -85,15 +85,20 @@ use dipole
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-       trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr);&
-       CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,user(i_Z),ierr);CHKERRA(ierr)
-  call MatSetSizes(user(i_Z),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);&
-       CHKERRA(ierr)
-  call MatSetFromOptions(user(i_Z),ierr);CHKERRA(ierr)
-  call MatSetUp(user(i_Z),ierr);CHKERRA(ierr)
-  call MatGetOwnershipRange(user(i_Z),i_start,i_end,ierr);CHKERRA(ierr)
-  call MatLoad(user(i_Z),viewer,ierr);CHKERRA(ierr)
+  & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
+  CHKERRA(ierr)
+  call MatCreate(MPI_COMM_WORLD,user(i_Z),ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(user(i_Z),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  & CHKERRA(ierr)
+  call MatSetFromOptions(user(i_Z),ierr)
+  CHKERRA(ierr)
+  call MatSetUp(user(i_Z),ierr)
+  CHKERRA(ierr)
+  call MatGetOwnershipRange(user(i_Z),i_start,i_end,ierr)
+  CHKERRA(ierr)
+  call MatLoad(user(i_Z),viewer,ierr)
+  CHKERRA(ierr)
 
   call MatGetSize(user(i_Z),size1,size2,ierr)
   
@@ -102,15 +107,20 @@ use dipole
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-       trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr);&
-       CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,user(i_A),ierr);CHKERRA(ierr)
-  call MatSetSizes(user(i_A),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);&
-       CHKERRA(ierr)
-  call MatSetFromOptions(user(i_A),ierr);CHKERRA(ierr)
-  call MatSetUp(user(i_A),ierr);CHKERRA(ierr)
-  call MatGetOwnershipRange(user(i_A),i_start,i_end,ierr);CHKERRA(ierr)
-  call MatLoad(user(i_A),viewer,ierr);CHKERRA(ierr)
+  & trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
+  CHKERRA(ierr)
+  call MatCreate(MPI_COMM_WORLD,user(i_A),ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(user(i_A),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  CHKERRA(ierr)
+  call MatSetFromOptions(user(i_A),ierr)
+  CHKERRA(ierr)
+  call MatSetUp(user(i_A),ierr)
+  CHKERRA(ierr)
+  call MatGetOwnershipRange(user(i_A),i_start,i_end,ierr)
+  CHKERRA(ierr)
+  call MatLoad(user(i_A),viewer,ierr)
+  CHKERRA(ierr)
 
   call MatGetSize(user(i_A),size1,size2,ierr)
   
@@ -121,91 +131,127 @@ use dipole
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-       trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr);&
-       CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,user(i_H0),ierr);CHKERRA(ierr)
-  call MatSetSizes(user(i_H0),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);&
-       CHKERRA(ierr)
-  call MatSetFromOptions(user(i_H0),ierr);CHKERRA(ierr)
-  call MatSetUp(user(i_H0),ierr);CHKERRA(ierr)
-  call MatGetOwnershipRange(user(i_H0),i_start,i_end,ierr);CHKERRA(ierr)
-  call MatLoad(user(i_H0),viewer,ierr);CHKERRA(ierr)
+  & trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr)
+  CHKERRA(ierr)
+  call MatCreate(MPI_COMM_WORLD,user(i_H0),ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(user(i_H0),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  CHKERRA(ierr)
+  call MatSetFromOptions(user(i_H0),ierr)
+  CHKERRA(ierr)
+  call MatSetUp(user(i_H0),ierr)
+  CHKERRA(ierr)
+  call MatGetOwnershipRange(user(i_H0),i_start,i_end,ierr)
+  CHKERRA(ierr)
+  call MatLoad(user(i_H0),viewer,ierr)
+  CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
 ! Create the Jacobian Matrix
 ! --------------------------------------------------------------------------
-  call MatCreate(PETSC_COMM_WORLD,J,ierr);CHKERRA(ierr)
-  call MatSetSizes(J,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);CHKERRA(ierr)
-  call MatSetFromOptions(J,ierr);CHKERRA(ierr)
-  call MatSetUp(J,ierr);CHKERRA(ierr)
+  call MatCreate(PETSC_COMM_WORLD,J,ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(J,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  CHKERRA(ierr)
+  call MatSetFromOptions(J,ierr)
+  CHKERRA(ierr)
+  call MatSetUp(J,ierr)
+  CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
 ! Propagate
 ! --------------------------------------------------------------------------
   ! Create the solution, and initial condition vector
-  call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,size,psi,ierr);&
-       CHKERRA(ierr)
+  call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,size,psi,ierr)
+  CHKERRA(ierr)
 
   ! We want the electron to start in the 1s state so we set psi0(0) = 1
-  call VecSetValue(psi,0,one,INSERT_VALUES,ierr);CHKERRA(ierr)
-  call VecAssemblyBegin(psi,ierr);CHKERRA(ierr)
-  call VecAssemblyEnd(psi,ierr);CHKERRA(ierr)
+  call VecSetValue(psi,0,one,INSERT_VALUES,ierr)
+  CHKERRA(ierr)
+  call VecAssemblyBegin(psi,ierr)
+  CHKERRA(ierr)
+  call VecAssemblyEnd(psi,ierr)
+  CHKERRA(ierr)
 
   ! Create timestepper context where to compute solutions
-  call TSCreate(PETSC_COMM_WORLD,ts,ierr);CHKERRA(ierr)
-  call TSSetProblemType(ts,TS_LINEAR,ierr);CHKERRA(ierr)
+  call TSCreate(PETSC_COMM_WORLD,ts,ierr)
+  CHKERRA(ierr)
+  call TSSetProblemType(ts,TS_LINEAR,ierr)
+  CHKERRA(ierr)
   
   ! Tell the timestepper context where to compute solutions
-  call TSSetSolution(ts,psi,ierr);CHKERRA(ierr)
+  call TSSetSolution(ts,psi,ierr)
+  CHKERRA(ierr)
 
   ! Tell the timestepper context what type of solver to use. I'll use 
   ! Crank-Nicolson, but this can be changed via a command line option
-  call TSSetType(ts,TSCN,ierr);CHKERRA(ierr)
+  call TSSetType(ts,TSCN,ierr)
+  CHKERRA(ierr)
   
   ! We will provide the Jacobian matrix only. Petsc will find the RHS. 
   call TSSetRHSFunction(ts,PETSC_NULL_VEC,TSComputeRHSFunctionLinear,user,&
-       ierr);CHKERRA(ierr)
+  & ierr)
+  CHKERRA(ierr)
 
   ! Now we will provide the Jacobian matrix
-  call TSSetRHSJacobian(ts,J,J,RHSMatrixSchrodinger,user,ierr);CHKERRA(ierr)
+  call TSSetRHSJacobian(ts,J,J,RHSMatrixSchrodinger,user,ierr)
+  CHKERRA(ierr)
 
   ! I'll set the initial time to be t = 0
-  call TSSetTime(ts,zero,ierr);CHKERRA(ierr)
+  call TSSetTime(ts,zero,ierr)
+  CHKERRA(ierr)
 
   ! Here we set the timestep 
-  call TSSetTimeStep(ts,dt,ierr);CHKERRA(ierr)
+  call TSSetTimeStep(ts,dt,ierr)
+  CHKERRA(ierr)
 
   ! Here we set the maximum time maxtime
-  call TSSetMaxTime(ts,max_time,ierr);CHKERRA(ierr)
+  call TSSetMaxTime(ts,max_time,ierr)
+  CHKERRA(ierr)
 
   ! If max_time isnt an exact multiple of dt we just interpolate backwards
   ! to get the value at this time
-  call TSSetExactFinalTime(ts,TS_EXACTFINALTIME_INTERPOLATE,ierr);&
-       CHKERRA(ierr)
+  call TSSetExactFinalTime(ts,TS_EXACTFINALTIME_INTERPOLATE,ierr)
+  CHKERRA(ierr)
 
   ! Here we set the KSP solver in SNES in TS
-  call TSGetSNES(ts,snes,ierr);CHKERRA(ierr)
-  call SNESSetType(snes,SNESKSPONLY,ierr);CHKERRA(ierr)
-  call SNESGetKSP(snes,ksp,ierr);CHKERRA(ierr)
-  call KSPSetType(ksp,KSPGMRES,ierr);CHKERRA(ierr)
-  call SNESSetKSP(snes,ksp,ierr);CHKERRA(ierr)
-  call TSSetSNES(ts,snes,ierr);CHKERRA(ierr)
+  call TSGetSNES(ts,snes,ierr)
+  CHKERRA(ierr)
+  call SNESSetType(snes,SNESKSPONLY,ierr)
+  CHKERRA(ierr)
+  call SNESGetKSP(snes,ksp,ierr)
+  CHKERRA(ierr)
+  call KSPSetType(ksp,KSPGMRES,ierr)
+  CHKERRA(ierr)
+  call SNESSetKSP(snes,ksp,ierr)
+  CHKERRA(ierr)
+  call TSSetSNES(ts,snes,ierr)
+  CHKERRA(ierr)
   
-  call TSGetMaxSteps(ts,max_steps,ierr);CHKERRA(ierr)
+  call TSGetMaxSteps(ts,max_steps,ierr)
+  CHKERRA(ierr)
   allocate(dipoleA(0:int(max_time/dt)))
   ! Now we finally solve the system 
-  call TSSolve(ts,psi,ierr);CHKERRA(ierr)
+  call TSSolve(ts,psi,ierr)
+  CHKERRA(ierr)
 
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_psi.output',&
-       viewer,ierr);CHKERRA(ierr)
-  call VecView(psi,viewer,ierr);CHKERRA(ierr)
+  & viewer,ierr)
+  CHKERRA(ierr)
+  call VecView(psi,viewer,ierr)
+  CHKERRA(ierr)
 
-  call VecAbs(psi,ierr);CHKERRA(ierr)
-  call VecPointwiseMult(psi,psi,psi,ierr);CHKERRA(ierr)
+  call VecAbs(psi,ierr)
+  CHKERRA(ierr)
+  call VecPointwiseMult(psi,psi,psi,ierr)
+  CHKERRA(ierr)
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
-       viewer,ierr);CHKERRA(ierr)
-  call VecView(psi,viewer,ierr);CHKERRA(ierr)
-  call VecSum(psi,norm,ierr);CHKERRA(ierr)
+  & viewer,ierr)
+  CHKERRA(ierr)
+  call VecView(psi,viewer,ierr)
+  CHKERRA(ierr)
+  call VecSum(psi,norm,ierr)
+  CHKERRA(ierr)
   print*,'Norm is',norm
 
 
@@ -216,10 +262,14 @@ use dipole
 ! --------------------------------------------------------------------------
 ! Clear memory
 ! --------------------------------------------------------------------------
-  call PetscViewerDestroy(viewer,ierr);CHKERRA(ierr)
-  call MatDestroy(user(i_H0),ierr);CHKERRA(ierr)
-  call MatDestroy(user(i_Z),ierr);CHKERRA(ierr)
-  call MatDestroy(user(i_A),ierr);CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
+  call MatDestroy(user(i_H0),ierr)
+  CHKERRA(ierr)
+  call MatDestroy(user(i_Z),ierr)
+  CHKERRA(ierr)
+  call MatDestroy(user(i_A),ierr)
+  CHKERRA(ierr)
   call PetscFinalize(ierr)
 end program main
 
@@ -235,7 +285,7 @@ function E(t)
   real(8)         :: pi
   common    /shared/ E0, w, cep, pi, T0
   
-  E = E0*sin(w*t+cep)*sin(pi*t/T0)**2
+  E = E0*dsin(w*t+cep)*dsin(pi*t/T0)**2.d0
   return
 endfunction E
 
@@ -260,18 +310,26 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   Z     =  user(i_Z)
   H0    =  user(i_H0)
   A     =  user(i_A)
-  scale =  cmplx(0,-1)
+  scale =  cmplx(0.d0,-1.d0)
   print*,t
-  call TSGetStepNumber(ts,step,ierr);CHKERRA(ierr)
-  call VecDuplicate(psi,tmp,ierr);CHKERRA(ierr)
-  call MatMult(A,psi,tmp,ierr);CHKERRA(ierr)
-  call VecDotRealPart(psi,tmp,real_part,ierr);CHKERRA(ierr)
+  call TSGetStepNumber(ts,step,ierr)
+  CHKERRA(ierr)
+  call VecDuplicate(psi,tmp,ierr)
+  CHKERRA(ierr)
+  call MatMult(A,psi,tmp,ierr)
+  CHKERRA(ierr)
+  call VecDotRealPart(psi,tmp,real_part,ierr)
+  CHKERRA(ierr)
   dipoleA(step) =  real_part
-  call MatCopy(H0,J,DIFFERENT_NONZERO_PATTERN,ierr);CHKERRA(ierr)
-  call MatAXPY(J,-E(t),Z,DIFFERENT_NONZERO_PATTERN,ierr);CHKERRA(ierr)
-  call MatScale(J,scale,ierr);CHKERRA(ierr)
+  call MatCopy(H0,J,DIFFERENT_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
+  call MatAXPY(J,-E(t),Z,DIFFERENT_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
+  call MatScale(J,scale,ierr)
+  CHKERRA(ierr)
   
-  call VecDestroy(tmp,ierr);CHKERRA(ierr)
+  call VecDestroy(tmp,ierr)
+  CHKERRA(ierr)
   return
 endsubroutine RHSMatrixSchrodinger
 
