@@ -2,46 +2,82 @@
 program main
 #include <slepc/finclude/slepceps.h>
   use slepceps
+  use hdf5
   implicit none
 ! --------------------------------------------------------------------------
 ! Declarations
 ! --------------------------------------------------------------------------
+  integer,  parameter  :: dp = kind(0.d0) ! double precision double precision
   PetscErrorCode      :: ierr
   Mat                 :: Z,ZH
-  PetscReal           :: h,R0
+  PetscReal           :: h,Rmax
   PetscInt            :: i_start,i_end,left_index,right_index
   PetscViewer         :: view_l1,view_l2
   PetscReal           :: rint
   PetscScalar         :: one
   PetscInt            :: i,j
-  integer             :: l,itter,n1,n2,n_max,l1,l2,l_max,size
-  integer             :: num_grid_points,fd_l1,fd_l2
+  integer(HID_T)      :: file_id, psi_id, h5_kind
+  integer             :: l,itter,n1,n2,nmax,l1,l2,lmax,size,proc_id,num_proc
+  integer             :: num_grid_points,fd_l1,fd_l2,h5_err,comm
   real(8)             :: pi
-  character(len = 3)  :: file! file number
+  character(len = 15) :: label ! File name without .h5 extension
+  character(len = 12) :: psi_name
+  character(len = 3)  :: strl! file number
   character(len = 6)  :: fmt ! format descriptor
   character(len = 24) :: file_name
   PetscReal,      allocatable :: u(:,:,:),v1(:),v2(:),r(:)
   PetscInt,       allocatable :: col(:)
   PetscScalar,    allocatable :: val(:)
   real(8),        allocatable :: clebsch_gordan(:)
+  integer(HSIZE_T)    :: psi_dims(1:2) 
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
-  h                = 0.065d0
+  comm             = MPI_COMM_WORLD
+  h                = 0.060d0
   one              = 1.d0
   pi               = 4.d0*datan(1.d0)
-  l_max            = 20
-  n_max            = 20
-  R0               = 100d0
-  num_grid_points  = int(R0/h)
-  R0               = num_grid_points*h
-  allocate(u(num_grid_points,n_max,0:l_max))
+  lmax             = 10
+  nmax             = 20
+  Rmax             = 1000d0
+  num_grid_points  = int(Rmax/h)
+  Rmax             = num_grid_points*h
+  label            = 'H_test' 
+
+  call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
+  if (ierr .ne. 0) then
+     print*,'SlepcInitialize failed'
+     stop
+  endif
+
+  call MPI_Comm_rank(comm,proc_id,ierr)
+  CHKERRA(ierr)
+  call MPI_Comm_size(comm,num_proc,ierr)
+  CHKERRA(ierr)
+
+  ! Opens hdf5 to read in the label.h5 file 
+	call h5open_f( h5_err)
+  if ( h5_err /= 0 ) then
+		print*,'h5open_f failed'
+		stop
+  end if
+
+  ! Adds the .h5 extension to the input file 
+  file_name = trim(label)//'.h5'
+
+  ! Opens the above file 
+  call h5fopen_f( trim(file_name), H5F_ACC_RDWR_F, file_id, h5_err)
+
+  ! Converts fortrans double kind to an hdf5 double type 
+	h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
+
+  allocate(u(num_grid_points,nmax,0:lmax))
   allocate(v1(num_grid_points))
   allocate(v2(num_grid_points))
   allocate(r(num_grid_points))
 
-  do l = 0,l_max
-     if     (l .le. 9 ) then
+  do l = 0,lmax
+     if (l .le. 9 ) then
         fmt = '(I1.1)'
      elseif (l .le. 99) then
         fmt = '(I2.2)'
@@ -49,39 +85,35 @@ program main
         fmt = '(I3.3)'
      endif
 
-     write(file,fmt) l
-     file_name ='small_vec'//trim(file)//'.bin'
-     open(10, file=file_name, form='unformatted',access='sequential')
-     do i = 1,n_max-l
-        do j = 1,num_grid_points
-           read(10) u(j,i,l)
-           
-        end do
-     end do
-     close(10)
+     write(strl,fmt) l
+     
+     psi_name ='Psi_l'//trim(strl)
+     
+     call h5dopen_f(file_id, psi_name, psi_id, h5_err)
+
+     psi_dims(1) = int(Rmax/h)
+     psi_dims(2) = nmax-l
+
+     call h5dread_f( psi_id, h5_kind, u(1:num_grid_points,1:nmax-l,l),  &
+     & psi_dims, h5_err)
+
+     call h5dclose_f( psi_id, h5_err)
   end do
 
-
-  ! If we truncate the basis (set n_max > l_max + 1) then we set the size of
+  ! If we truncate the basis (set nmax > lmax + 1) then we set the size of
   ! Z differently  
-  if(n_max .le. l_max+1) then 
-     size = (n_max - 1)*n_max/2 + l_max+ 1
+  if(nmax .le. lmax+1) then 
+     size = (nmax - 1)*nmax/2 + lmax+ 1
   else
-     size = (l_max + 1)*(l_max + 2)/2 + (n_max - l_max - 2)*(l_max + 1) + &
-          l_max + 1
+     size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
+          lmax + 1
   endif
   
-  allocate(clebsch_gordan(l_max))
-  allocate(col(n_max))
-  allocate(val(n_max))
+  allocate(clebsch_gordan(lmax))
+  allocate(col(nmax))
+  allocate(val(nmax))
  
 
-  call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
-  if (ierr .ne. 0) then
-     print*,'SlepcInitialize failed'
-     stop
-  endif
- 
 ! --------------------------------------------------------------------------
 ! Create r Vector
 ! --------------------------------------------------------------------------
@@ -92,7 +124,7 @@ program main
 
   open(5, file='clebsch_gordan.bin', form='unformatted',access='stream')
   
-  do itter = 1,l_max
+  do itter = 1,lmax
      read(5, pos=8*itter - 7) clebsch_gordan(itter)
   enddo
   close(5)
@@ -100,14 +132,19 @@ program main
 ! --------------------------------------------------------------------------
 ! Create Z matrix
 ! --------------------------------------------------------------------------
-  call MatCreate(PETSC_COMM_WORLD,Z,ierr);CHKERRA(ierr)
-  call MatSetSizes(Z,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr);CHKERRA(ierr)
-  call MatSetFromOptions(Z,ierr);CHKERRA(ierr)
-  call MatSetUp(Z,ierr);CHKERRA(ierr)
-  call MatGetOwnershipRange(Z,i_start,i_end,ierr);CHKERRA(ierr)
+  call MatCreate(PETSC_COMM_WORLD,Z,ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(Z,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  CHKERRA(ierr)
+  call MatSetFromOptions(Z,ierr)
+  CHKERRA(ierr)
+  call MatSetUp(Z,ierr)
+  CHKERRA(ierr)
+  call MatGetOwnershipRange(Z,i_start,i_end,ierr)
+  CHKERRA(ierr)
  
   ! Itterate over angular momentum to calculate half the matrix elements
-  do l = 0,l_max-1
+  do l = 0,lmax-1
      ! For linearly polarized pulses the only non-zero matrix elements are 
      ! for l+/-1
      ! we will compute the (l,l+1) elements only and take care of the rest 
@@ -116,22 +153,22 @@ program main
      l1 = l
      l2 = l + 1
      ! For each l value we compute the corresponding matrix elements of Z
-     do n1=l1+1,n_max
+     do n1=l1+1,nmax
         ! Here I convert the n1 and l1 value to its corresponding index 
-        if(n1 .le. l_max+1) then
+        if(n1 .le. lmax+1) then
            left_index = (n1 - 1)*n1/2 + l1
         else
-           left_index = (l_max + 1)*(l_max + 2)/2 + (n1 - l_max - 2)*(l_max &
+           left_index = (lmax + 1)*(lmax + 2)/2 + (n1 - lmax - 2)*(lmax &
                 +1) + l1
         endif
         ! Here I convert the n2 and l2 value to its corresponding index
         itter = 1
-        do n2=l2+1,n_max
-           if(n2 .le. l_max+1) then
+        do n2=l2+1,nmax
+           if(n2 .le. lmax+1) then
               right_index = (n2 - 1)*n2/2 + l2
            else
-              right_index = (l_max + 1)*(l_max + 2)/2 + (n2 - l_max - 2)* &
-                   (l_max + 1) + l2
+              right_index = (lmax + 1)*(lmax + 2)/2 + (n2 - lmax - 2)* &
+                   (lmax + 1) + l2
            endif
            ! I create a vector of indicies corresponding to what columns I 
            ! am setting for each row
@@ -161,24 +198,32 @@ program main
   enddo
 
   ! We finish building Z now that we've finished adding elements
-  call MatAssemblyBegin(Z,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
-  call MatAssemblyEnd(Z,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
+  call MatAssemblyBegin(Z,MAT_FINAL_ASSEMBLY,ierr)
+  CHKERRA(ierr)
+  call MatAssemblyEnd(Z,MAT_FINAL_ASSEMBLY,ierr)
+  CHKERRA(ierr)
 
   ! Since we only added half the elements we can get the rest by adding Z to 
   ! its conjugate transpose 
-  call MatDuplicate(Z,MAT_DO_NOT_COPY_VALUES,ZH,ierr);CHKERRA(ierr)
-  call MatHermitianTranspose(Z,MAT_INITIAL_MATRIX,ZH,ierr);CHKERRA(ierr)
-  call MatAXPY(Z,one,ZH,DIFFERENT_NONZERO_PATTERN,ierr);CHKERRA(ierr)
+  call MatDuplicate(Z,MAT_DO_NOT_COPY_VALUES,ZH,ierr)
+  CHKERRA(ierr)
+  call MatHermitianTranspose(Z,MAT_INITIAL_MATRIX,ZH,ierr)
+  CHKERRA(ierr)
+  call MatAXPY(Z,one,ZH,DIFFERENT_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
 
   ! We now save the complete Z matrix to a binary file on the disk
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-       "small_dipoleMatrix.bin",FILE_MODE_WRITE,view_l1,ierr);&
+       label//"_dipoleMatrix.bin",FILE_MODE_WRITE,view_l1,ierr);&
        CHKERRA(ierr)
-  call MatView(Z,view_l1,ierr);CHKERRA(ierr)
-  call MatDestroy(ZH,ierr);CHKERRA(ierr)
+  call MatView(Z,view_l1,ierr)
+  CHKERRA(ierr)
+  call MatDestroy(ZH,ierr)
+  CHKERRA(ierr)
   ! Now that Z is saved to memory we clear out memory and exit
   
-  call MatDestroy(Z,ierr);CHKERRA(ierr)
+  call MatDestroy(Z,ierr)
+  CHKERRA(ierr)
   deallocate(val)
   deallocate(col)
 
