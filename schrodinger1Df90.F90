@@ -109,7 +109,7 @@ subroutine Turning_pt( num_points, r, l, E, Rm, im)
 
   if (dble(1)+2d0*E*dble(l)*(dble(l)+1d0) >= 0) then
     Rm  = max( ( -1d0 + dsqrt(dble(1)+2d0*E*dble(l)*(dble(l)+1d0)))/(2d0*E)&
-    &  ,(-1d0-dsqrt(1d0+2d0*E*dble(l)*(dble(l)+1d0)))/(2d0*E))
+    & ,(-1d0-dsqrt(1d0+2d0*E*dble(l)*(dble(l)+1d0)))/(2d0*E))
   else
     Rm = r(num_points+1)/2
   end if
@@ -199,7 +199,7 @@ end subroutine Match_and_normalize
 ! Itterate
 !--------------------------------------------------------------------------
 subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
-  &  num_nodes, error)
+  & num_nodes, error)
   ! This subroutine (1) finds the classical (call) turning pt for given
   ! E. (2) integrates the TISE from 0 to the turning pt (yl) and from R
   ! to the turning pt (yr) and (3) finds the error btwn yl and yr and
@@ -263,25 +263,25 @@ subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
   ! Look up "Numerov method for singular potentials"
   ! A few papers should come up.
   yl(2) = (-24.d0 + h**4.d0*Q(1)*Q(3) + h**2.d0*( &
-  &  13.d0*Q(1) -3.d0*Q(3) ))*yl(1)/(-12.d0 + h**2.d0*(&
-  &  2.d0*Q(2) - 3.d0*Q(3) ) + h**4.d0*Q(2)*Q(3))
+  & 13.d0*Q(1) -3.d0*Q(3) ))*yl(1)/(-12.d0 + h**2.d0*(&
+  & 2.d0*Q(2) - 3.d0*Q(3) ) + h**4.d0*Q(2)*Q(3))
 
   yl(3) = (-36.d0 -11.d0*h**4.d0*Q(1)*Q(2) + 9.d0*h**2.d0*( &
-  &  3.d0*Q(1) + 2.d0*Q(2) ))*yl(1)/(-12.d0 + h**2.d0*(&
-  &  2.d0*Q(2) - 3.d0*Q(3) ) + h**4.d0*Q(2)*Q(3))
+  & 3.d0*Q(1) + 2.d0*Q(2) ))*yl(1)/(-12.d0 + h**2.d0*(&
+  & 2.d0*Q(2) - 3.d0*Q(3) ) + h**4.d0*Q(2)*Q(3))
 
   ! Integrate the rest of the values with the standard Numerov method
   do i = 3,im
     ! Finds the next value of yl
     yl(i+1) = ( 2d0*( 1d0 - 5d0*Q(i)*h**2d0/12d0 )*yl(i)-&
-    &  ( 1d0 + Q(i-1)*h**2d0/12d0)*yl(i-1))/&
-    &  (1d0+Q(i+1)*h**2d0/12d0)
+    & ( 1d0 + Q(i-1)*h**2d0/12d0)*yl(i-1))/&
+    & (1d0+Q(i+1)*h**2d0/12d0)
 
     ! Counts the number of nodes
     if((yl(i+1)>0.and.(yl(i)<0.and.(yl(i-1)<0.and.(yl(i-2)<0.and.&
-    &  (yl(i-3)<0))))).or.&
-    &  (yl(i+1)<0.and.(yl(i)>0.and.(yl(i-1)>0.and.(yl(i-2)>0.and.&
-    &  (yl(i-3)>0)))))) then
+    & (yl(i-3)<0))))).or.&
+    & (yl(i+1)<0.and.(yl(i)>0.and.(yl(i-1)>0.and.(yl(i-2)>0.and.&
+    & (yl(i-3)>0)))))) then
       if(i>3.and.i<im) then
         num_nodes = num_nodes+1
       end if
@@ -293,13 +293,13 @@ subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
   do i = num_points,im,-1
     ! Finds the next value of yr
     yr(i-1) = ( 2d0*( 1d0 - 5d0*Q(i)*h**2d0/12d0 )*yr(i)-&
-    &  (1d0+Q(i+1)*h**2d0/12d0)*yr(i+1))/&
-    &  (1d0+Q(i-1)*h**2d0/12d0)
+    & (1d0+Q(i+1)*h**2d0/12d0)*yr(i+1))/&
+    & (1d0+Q(i-1)*h**2d0/12d0)
     ! Counts the number of nodes
     if((yr(i-1)>0.and.(yr(i)<0.and.(yr(i+1)<0.and.(yr(i+2)<0.and.&
-    &  (yr(i+3)<0))))).or.&
-    &  (yr(i-1)<0.and.(yr(i)>0.and.(yr(i+1)>0.and.(yr(i+2)>0.and.&
-    &  (yr(i+3)>0)))))) then
+    & (yr(i+3)<0))))).or.&
+    & (yr(i-1)<0.and.(yr(i)>0.and.(yr(i+1)>0.and.(yr(i+2)>0.and.&
+    & (yr(i+3)>0)))))) then
       if(i<num_points-2 .and. i>im) then
         num_nodes = num_nodes+1
       end if
@@ -316,7 +316,7 @@ end subroutine Itterate
 ! Get_bounds
 !--------------------------------------------------------------------------
 subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
-  &  Emin, Emax, min, max)
+  & Emin, Emax, min, max)
   ! This subroutine finds an upper and lower bound for possible energies
   ! which yield the correct number of nodes n-l-1 for the wfns
   implicit none
@@ -334,28 +334,28 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
   nodes = n-l-1
   ! Finds an appropriate bound for Emin
   call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr, num_nodes,&
-  &  min)
+  & min)
 
   ! Decrease Emin till an appropriate number of nodes are formed
   do while(num_nodes>nodes)
     Emin = Emin-dsqrt(dE)
-    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
-    &  num_nodes, min)
+    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr, &
+    & num_nodes, min)
 
   end do
 
   ! Increase Emin till an appropriate number of nodes are formed
   do while(num_nodes<nodes)
     Emin = Emin+dsqrt(dE)
-    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
-    &  num_nodes, min)
+    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr, &
+    & num_nodes, min)
 
   end do
 
   do while(num_nodes>nodes)
     Emin = Emin-dE
-    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
-    &  num_nodes, min)
+    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr, &
+    & num_nodes, min)
 
   end do
 
@@ -369,34 +369,34 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
     Eold = Emin
     Emin = Emin-dE
 
-    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr,  &
-    &  num_nodes, min)
+    call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr, &
+    & num_nodes, min)
 
   end do
 
   ! Verify that the condition is met
   Emin = Eold
   call Itterate( l, num_points, R0, Rm, im, Emin, r, V, yl, yr, num_nodes,&
-  &  min)
+  & min)
 
   ! Finds the appropriate bound for Emax
   Emax = Emin+dE
   call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr, num_nodes,&
-  &  max)
+  & max)
 
   ! Increase Emax until the node constraint is satsified
   do while(num_nodes<nodes+1)
     Emax = Emax+dsqrt(dE)
-    call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr,  &
-    &  num_nodes, max)
+    call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr, &
+    & num_nodes, max)
 
   end do
 
   ! Decrease Emax until the node constraint is satsified
   do while(num_nodes>nodes)
     Emax = Emax-dE
-    call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr,  &
-    &  num_nodes, max)
+    call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr, &
+    & num_nodes, max)
 
   end do
 
@@ -405,8 +405,8 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
   do while(num_nodes == nodes .and. Emax < 15)
     Eold = Emax
     Emax = Emax+dE
-    call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr,  &
-    &  num_nodes, max)
+    call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr, &
+    & num_nodes, max)
 
   end do
 
@@ -415,7 +415,7 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
 
   ! Generate left and right wfns for Emax = Eold 
   call Itterate( l, num_points, R0, Rm, im, Emax, r, V, yl, yr, num_nodes,&
-  &  max)
+  & max)
 
 end subroutine Get_bounds
 
@@ -497,7 +497,7 @@ subroutine Refine( n, l, num_points, R0, r, V, E, tol, y, error)
 
     ! Compute the left and right wfns using E
     call Itterate( l, num_points, R0, Rm, im, E, r, V, yl, yr, num_nodes,&
-    &  error)
+    & error)
 
     ! Get the energy correction from the left and right wfns
     call Get_correction(yl,yr,num_points,im,R0,E1)
@@ -534,7 +534,7 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
   real(dp),   dimension(0:num_points+1) :: yl, yr, r, V
   integer  :: im, nodes, num_nodes
   ! External
-  external  :: Init_mesh, Init_pot, Itterate, Match_and_normalize
+  external :: Init_mesh, Init_pot, Itterate, Match_and_normalize
   
   ! Compute the number of nodes that the n,l wfn must have
   nodes = n-l-1
@@ -559,12 +559,12 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
   ! for the search is under some tolerance
   do while( range > dE )
     ! Look at an energy higher than E 
-    call Itterate( l, num_points, R0, Rm, im, E+dE, r, V, yl, yr,  &
-    &  num_nodes, right)
+    call Itterate( l, num_points, R0, Rm, im, E+dE, r, V, yl, yr, &
+    & num_nodes, right)
 
     ! Look at an energy less than E
-    call Itterate( l, num_points, R0, Rm, im, E-dE, r, V, yl, yr,  &
-    &  num_nodes, left)
+    call Itterate( l, num_points, R0, Rm, im, E-dE, r, V, yl, yr, &
+    & num_nodes, left)
 
     ! If once Energy E+/-dE produces wfns that match better split the
     ! domain in half 
@@ -578,7 +578,7 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
     range = finish - start
 
     ! Compute the new midpoint
-    E   = (start + finish)/2
+    E = (start + finish)/2
 
   end do
 
@@ -590,8 +590,8 @@ end subroutine Search
 !--------------------------------------------------------------------------
 ! Initialize
 !--------------------------------------------------------------------------
-subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space,    &
-  &  ener_dset, psi_space, psi_dset, h5_err, num_proc, proc_id,  mpi_err)
+subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space, &
+  & ener_dset, psi_space, psi_dset, h5_err, num_proc, proc_id,  mpi_err)
   ! Starts mpi + hdf5 and also makes the hdf5 file and structure that will 
   ! be used to output all of the data form this program 
   use hdf5
@@ -644,8 +644,8 @@ subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space,    &
   call h5pset_fapl_mpio_f( plist_id, comm, info, h5_err)
 
   ! Create the hdf5 file with the property list and parallel acess
-  call h5fcreate_f( file_name, H5F_ACC_TRUNC_F, file_id, h5_err,  &
-  &  access_prp = plist_id)
+  call h5fcreate_f( file_name, H5F_ACC_TRUNC_F, file_id, h5_err, &
+  & access_prp = plist_id)
 
   ! Converts fortran real(dp) kind to mpi real numbers
   h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
@@ -677,12 +677,12 @@ subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space,    &
     
     ! Connects the datasapce to the hdf5 file and gives it a name 
     call h5dcreate_f( file_id, "Energy_l"//trim(strl), h5_kind, ener_space(l), &
-    &  ener_dset(l), h5_err)
+    & ener_dset(l), h5_err)
 
     ! Does the same as before for the energy but with the wfns 
     call h5screate_simple_f( 2, psi_dims, psi_space(l), h5_err)
     call h5dcreate_f( file_id, "Psi_l"//trim(strl), h5_kind, psi_space(l), &
-    &  psi_dset(l), h5_err)
+    & psi_dset(l), h5_err)
 
   end do 
 
@@ -691,8 +691,8 @@ end subroutine Initialize
 !--------------------------------------------------------------------------
 ! Finalize
 !--------------------------------------------------------------------------
-subroutine Finalize( lmax, file_id, ener_space, ener_dset,   &
-  &  psi_space, psi_dset, h5_err, mpi_err)
+subroutine Finalize( lmax, file_id, ener_space, ener_dset, &
+  & psi_space, psi_dset, h5_err, mpi_err)
   ! Closes all hdf5 and mpi objects 
   use mpi
   use hdf5
@@ -798,8 +798,8 @@ subroutine Process_vec( n, l, nmax, num_points, Rmax, h, y, u)
 
   ! Make the leftover space 0
   if ( num_points+1 < int(Rmax/h) ) then
-    u(num_points + 2:int(Rmax/h),n - l) =   &
-    &  (/( 0,i = num_points + 2, int(Rmax/h) )/)
+    u(num_points + 2:int(Rmax/h),n - l) = &
+    & (/( 0,i = num_points + 2, int(Rmax/h) )/)
   end if
 
   ! Orthogonalize the basis every time a new vector is added.
@@ -811,7 +811,7 @@ end subroutine Process_vec
 ! Process_vec
 !--------------------------------------------------------------------------
 subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
-  &  proc_id, num_proc, ener_dset, psi_dset, h5_err)
+  & proc_id, num_proc, ener_dset, psi_dset, h5_err)
   use hdf5
   use mpi
   implicit none 
@@ -873,12 +873,12 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
       allocate( y(0:num_points+1))
 
       ! Search for the correct n,l eigenfunction
-      call Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y,  &
-      &  E(n-l))
+      call Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, &
+      & E(n-l))
       
       ! Print information about each n,l computed 
-      print 20, '|n|', n, '|l|', l, '|E|', E(n-l), '|ΔE/E|',   &
-      &  (E(n-l)+ 0.5d0/dble(n)**2.d0)/E(n-l), '|'
+      print 20, '|n|', n, '|l|', l, '|E|', E(n-l), '|ΔE/E|', &
+      & (E(n-l)+ 0.5d0/dble(n)**2.d0)/E(n-l), '|'
       
       ! Use old calculation for new energy estimates
       Eold = Emin
@@ -894,8 +894,8 @@ subroutine Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
     end do
   
     ! Save the l block to our label.h5 file 
-    call Save_spectrum( l, nmax, lmax, Rmax, h, u, E, ener_dset,   &
-    &  psi_dset, h5_err)
+    call Save_spectrum( l, nmax, lmax, Rmax, h, u, E, ener_dset, &
+    & psi_dset, h5_err)
     
     ! Remove u and E from memory
     deallocate( u)
@@ -919,11 +919,11 @@ program Main
   implicit none
 
   ! Declarations
-  integer, parameter    :: dp = kind(0.d0) ! double precision
-  integer               :: lmax, nmax, Znuc
-  real(dp)              :: R00, dE, Emin, Emax, tol, h, Rmax
+  integer, parameter  :: dp = kind(0.d0) ! double precision
+  integer             :: lmax, nmax, Znuc
+  real(dp)            :: R00, dE, Emin, Emax, tol, h, Rmax
   integer :: num_proc, mpi_err, proc_id
-  character(len = 15)   :: label
+  character(len = 15) :: label
   integer(HID_T) :: file_id
   integer(HID_T), allocatable ::  ener_space(:), ener_dset(:)
   integer(HID_T), allocatable ::  psi_space(:), psi_dset(:)
@@ -933,11 +933,11 @@ program Main
   ! Parameters are set here for now. They will be set with a json file.
   h     = 0.060d0   ! Distance between equally spaced nodes
   R00   = 30.d0     ! Box size for the ground state
-  nmax  = 10        ! Highest energy level computed 
+  nmax  = 20        ! Highest energy level computed 
   Rmax  = 1000.d0   ! Maximum possible box size
   dE    = 1d-5      ! Energy tolerance for the binary search
   tol   = 1d-14     ! Error tolerance for the refinement stage 
-  lmax  = 2         ! Maximum possible angular momentum
+  lmax  = 10        ! Maximum possible angular momentum
   Emax  = 100.d0    ! Maximum possible energy (for finding bounds)
   Emin  = -1.d0     ! Lower bound for the ground state 
   Znuc  = 1         ! Nuclear charge (1 for hydrogen)
@@ -960,9 +960,9 @@ program Main
   allocate( psi_space(0:lmax), psi_dset(0:lmax))
 
   ! Initializes mpi and hdf5 and sets up the file structure 
-  call Initialize( h, nmax, lmax, Rmax, label, file_id,    &
-  &  ener_space, ener_dset, psi_space, psi_dset, h5_err, num_proc,  &
-  &  proc_id,  mpi_err)
+  call Initialize( h, nmax, lmax, Rmax, label, file_id, &
+  & ener_space, ener_dset, psi_space, psi_dset, h5_err, num_proc, &
+  & proc_id,  mpi_err)
 
   ! Only processessor 0 will print this so duplicates are not created
   if ( proc_id == 0 ) then
@@ -986,7 +986,7 @@ program Main
   ! Generates the basis + energy for this system and writes it to 
   ! label.h5
   call Get_basis( h, R00, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
-  &  proc_id, num_proc, ener_dset, psi_dset, h5_err)
+  & proc_id, num_proc, ener_dset, psi_dset, h5_err)
 
   ! Prints when proc_id #proc_id has finished the above step 
   ! this lets the user know whether or not any processor has gotten 
@@ -995,8 +995,8 @@ program Main
   print 20, 'end     ', proc_id
 
   ! Closes all of the mpi and hdf5 structures 
-  call Finalize( lmax, file_id, ener_space, ener_dset, psi_space,   &
-  &  psi_dset, h5_err, mpi_err)
+  call Finalize( lmax, file_id, ener_space, ener_dset, psi_space, &
+  & psi_dset, h5_err, mpi_err)
 
   ! Deallocates all remaining varaibles in the program 
   deallocate( ener_space, ener_dset, psi_space, psi_dset)
