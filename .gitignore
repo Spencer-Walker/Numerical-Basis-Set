@@ -6,3 +6,4 @@ generateH0f90
 generateDipoleAccelerationf90
 propagatef90
 makefile
+*.mod
