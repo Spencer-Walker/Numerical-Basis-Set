@@ -1,3 +1,4 @@
 *.h5
 schrodinger1Df90
+*.bin*
 makefile
