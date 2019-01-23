@@ -20,17 +20,17 @@ module simulation_parametersf90
   use slepceps
   implicit none
   integer,  parameter :: dp = kind(0.d0) 
-  real(dp), parameter :: grid_space = 0.060d0  
+  real(dp), parameter :: grid_space = 0.07d0  
   real(dp), parameter :: R_min = 30.d0    
-  real(dp), parameter :: R_max = 1000.d0   
-  integer,  parameter :: n_max = 20      
-  integer,  parameter :: l_max = 10        
+  real(dp), parameter :: R_max = 750.d0   
+  integer,  parameter :: n_max = 1000      
+  integer,  parameter :: l_max = 60  
   real(dp), parameter :: binary_search_tol = 1d-5  
   real(dp), parameter :: refinement_tol = 1d-14    
-  real(dp), parameter :: E_max  = 100.d0    
+  real(dp), parameter :: E_max  = 1000.d0    
   real(dp), parameter :: E_min  = -1.d0      
   integer,  parameter :: Z_nuc  = 1        
-  character(len = 15), parameter :: hdf5_file_label = 'H_test' 
+  character(len = 15), parameter :: hdf5_file_label = 'H' 
   PetscScalar, parameter :: two = 2.d0
   PetscScalar, parameter :: one = 1.d0
   PetscScalar, parameter :: zero = 0.d0

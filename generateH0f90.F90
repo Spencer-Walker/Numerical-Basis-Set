@@ -28,14 +28,16 @@ use simulation_parametersf90
   character(len = 25) :: data
   PetscScalar         :: val(1)
   integer(HSIZE_T)    :: ener_dims(1:1), psi_dims(1:2)
-  PetscReal, allocatable   :: E(:,:),M(:,:),u(:,:,:)
+  PetscReal, allocatable   :: u(:,:),E(:,:)
+  PetscScalar, allocatable :: M(:,:)
   real(dp)  :: start_time, end_time, Rmax, h, Rces
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
   call CPU_TIME(start_time)
 
-  10 format(A8,ES9.2)
+  10 format(A1,I4)
+  20 format(A8,ES9.2)
 
   comm  = MPI_COMM_WORLD
   h     = grid_space
@@ -46,6 +48,8 @@ use simulation_parametersf90
   num_points = int(Rmax/h)
   Rces  = 0.95d0*Rmax
   ces_point = int(Rces/h)
+  print*, 'num_points', num_points
+  
 
   call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
   if ( ierr /= 0 ) then
@@ -59,7 +63,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
 
   allocate(E(nmax,0:lmax),M(ces_point-1:num_points,ces_point-1:num_points))
-  allocate(u(num_points,nmax,0:lmax))
+  allocate(u(num_points,nmax))
 
   M(:,:) = 0.d0
  
@@ -121,7 +125,8 @@ use simulation_parametersf90
 
 
   ! Itterate over angular momentum to calculate the matrix elements
-  do l = 0,lmax    
+  do l = 0,lmax  
+    print 10, 'l', l
     ! Figure out how many digits are needed for the input file
     if ( l .le. 9 ) then
       fmt = '(I1.1)'
@@ -144,7 +149,6 @@ use simulation_parametersf90
     
     ! Fills the lth column of E(:,:) with the energy data from the dataset
     call h5dread_f( ener_id, h5_kind, E(1:nmax-l,l), ener_dims, h5_err) 
-
     ! Closes the dataset
     call h5dclose_f( ener_id, h5_err)
     
@@ -154,15 +158,12 @@ use simulation_parametersf90
 
     psi_dims(1) = int(Rmax/h)
     psi_dims(2) = nmax-l
-
-    call h5dread_f( psi_id, h5_kind, u(1:num_points,1:nmax-l,l),  &
+    call h5dread_f( psi_id, h5_kind, u(1:num_points,1:nmax-l),  &
     & psi_dims, h5_err)
-
     call h5dclose_f( psi_id, h5_err)
-
     ! For each l value we compute the corresponding matrix elements of H0
-    do n=l+1,nmax
-      
+    
+    do n=l+1,nmax    
       ! Here I convert the n and l value to its corresponding index 
       if(n .le. lmax+1) then
           index = (n - 1)*n/2 + l
@@ -172,8 +173,7 @@ use simulation_parametersf90
       endif    
       
       ! Convert the real energy to a PetscScalar
-      val = E(n-l,l) + DOT_PRODUCT(u(ces_point-1:,n-l,l),MATMUL(M,u(ces_point-1:,n-l,l)))
-      print*, val
+      val = E(n-l,l) + DOT_PRODUCT(u(ces_point-1:,n-l),MATMUL(M(ces_point-1:,ces_point-1:),u(ces_point-1:,n-l)))
       ! Insert the energy into the field free matrix 
       call MatSetValue(H0,index,index,val,INSERT_VALUES,ierr)
       CHKERRA(ierr)
@@ -181,6 +181,7 @@ use simulation_parametersf90
     close(20)
   enddo
 
+  print*,'buildig matrix'
   ! Build the matrix
   call MatAssemblyBegin(H0,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)
@@ -195,6 +196,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
 
   ! Clear memory 
+  deallocate(u,E,M)
   call MatDestroy(H0,ierr)
   CHKERRA(ierr)
   call h5fclose_f( file_id, h5_err)
@@ -203,6 +205,6 @@ use simulation_parametersf90
 
   call CPU_TIME(end_time)
   
-  print 10, 'time   :', end_time-start_time
+  print 20, 'time   :', end_time-start_time
 
 end program main
