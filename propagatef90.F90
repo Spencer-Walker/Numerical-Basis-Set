@@ -10,6 +10,7 @@ end module dipole
 
 program main
 use dipole 
+use simulation_parametersf90
 #include <petsc/finclude/petscts.h>
   use petscts
   implicit none
@@ -29,12 +30,10 @@ use dipole
   PetscMPIInt     :: rank 
   PetscScalar     :: norm
   integer         :: nmax,lmax,size,num_grid_points
-  real(8)         :: pi
-  PetscReal       :: E0,w,cep,T0,zero,one,intensity,wavelength,num_cycles,dt
+  PetscReal       :: E0,w,cep,T0,intensity,wavelength,numcycles,dt
   PetscReal       :: h,r0,max_time
   character(len=15) :: label
   external        :: RHSMatrixSchrodinger
-  common    /shared/ E0, w, cep, pi, T0
   parameter         (i_Z = 1, i_H0 = 2,i_A = 3)
   
 ! --------------------------------------------------------------------------
@@ -47,12 +46,7 @@ use dipole
     stop
   endif
   failures        = -1
-  one             = 1.d0
-  zero            = 0.d0
-  pi              = 4.d0*datan(1.d0)
-  lmax            = 10
-  nmax            = 20
-  label           = 'H_test'
+  label = hdf5_file_label
   ! If nmax <= lmax+1 we chose the normal basis size but if it is large 
   ! the basis is truncated in l
   if(nmax .le. lmax+1) then
@@ -66,14 +60,13 @@ use dipole
 
   ! These are the default values in atomic units the user is free to change 
   ! them as an extra argument when running the program 
-  dt              = 0.05d0
-  cep             = 0d0
-  num_cycles      = 2d0
-  
-  E0              = 0.053375290941998d0
-  w               = 0.056953098011833d0
-  T0              = 4*2.206441976474781d+02 
-  max_time        = T0
+  dt   = time_resolution
+  cep  = envelope_phase
+  numcycles  = num_cycles
+  E0 = Electric_field_strength
+  w  = omega
+  T0 = period
+  max_time = numcycles*T0
   print*,'E0 =',E0
   print*,' w =',w
   print*,'T0 =',T0
@@ -90,7 +83,7 @@ use dipole
   call MatCreate(MPI_COMM_WORLD,user(i_Z),ierr)
   CHKERRA(ierr)
   call MatSetSizes(user(i_Z),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
-  & CHKERRA(ierr)
+  CHKERRA(ierr)
   call MatSetFromOptions(user(i_Z),ierr)
   CHKERRA(ierr)
   call MatSetUp(user(i_Z),ierr)
@@ -280,13 +273,19 @@ end program main
 ! --------------------------- Evaluate E(t) --------------------------------
 function E(t)
   ! This function computes the electric field at some given time 
+  use simulation_parametersf90
+  implicit none 
   PetscReal       :: E0,w,cep,T0,t
   PetscScalar     :: E
-  real(8)         :: pi
-  common    /shared/ E0, w, cep, pi, T0
+
+  E0 = Electric_field_strength
+  w  = omega
+  cep = envelope_phase
+  T0 = period
   
-  E = E0*dsin(w*t+cep)*dsin(pi*t/T0)**2.d0
+  E = E0*sin(w*t+cep)*sin(pi*t/T0)**2.d0
   return
+
 endfunction E
 
 ! --------------------------------------------------------------------------
@@ -295,6 +294,7 @@ endfunction E
 ! ----------------------- RHSMatrixSchrodinger -----------------------------
 subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   use petscts
+  use simulation_parametersf90
   use dipole
   implicit none
   TS              :: ts
@@ -305,8 +305,8 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   PetscScalar     :: E,scale
   PetscErrorCode  :: ierr
   PetscInt        :: i_Z,i_H0,i_A,size1,size2,step
-  common    /shared/ T0
   parameter (i_Z = 1, i_H0 = 2,i_A = 3)
+  T0    =  period
   Z     =  user(i_Z)
   H0    =  user(i_H0)
   A     =  user(i_A)
