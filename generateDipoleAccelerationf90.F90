@@ -24,7 +24,7 @@ program main
   character(len = 12) :: psi_name
   character(len = 6)  :: fmt ! format descriptor
   character(len = 30) :: file_name
-  PetscReal,      allocatable :: u(:,:,:),v1(:),v2(:),r(:)
+  PetscReal,      allocatable :: u(:,:,:),v1(:),v2(:),r(:),y(:,:)
   PetscInt,       allocatable :: col(:)
   PetscScalar,    allocatable :: val(:)
   real(dp),       allocatable :: clebsch_gordan(:)
@@ -78,6 +78,7 @@ program main
   allocate(v1(num_points))
   allocate(v2(num_points))
   allocate(r(num_points))
+  allocate(y(num_points,nmax))
 
   do l = 0,lmax
     if     (l .le. 9 ) then
@@ -88,19 +89,18 @@ program main
       fmt = '(I3.3)'
     endif
 
-    write(strl,fmt) l
+  write(strl,fmt) l
 
-    Psi_name = 'Psi_l'//trim(strl)
+  Psi_name = 'Psi_l'//trim(strl)
 
-    call h5dopen_f(file_id, psi_name, psi_id, h5_err)
+  call h5dopen_f(file_id, psi_name, psi_id, h5_err)
 
-    psi_dims(1) = int(Rmax/h)
-    psi_dims(2) = nmax-l
+  psi_dims(1) = int(Rmax/h)
+  psi_dims(2) = nmax-l
 
-    call h5dread_f( psi_id, h5_kind, u(1:num_points,1:nmax-l,l),  &
-    & psi_dims, h5_err)
-
-    call h5dclose_f( psi_id, h5_err)
+  call h5dread_f( psi_id, h5_kind, y, psi_dims, h5_err)
+  u(1:num_points,1:nmax-l,l) = y
+  call h5dclose_f( psi_id, h5_err)
 
   end do
 

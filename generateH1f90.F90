@@ -16,15 +16,15 @@ program main
   PetscReal           :: rint
   PetscInt            :: i,j
   integer(HID_T)      :: file_id, psi_id, h5_kind
-  integer             :: l,itter,n1,n2,nmax,l1,l2,lmax,size,proc_id,num_proc
-  integer             :: num_points,fd_l1,fd_l2,h5_err,comm
+  integer             :: l,itter,n1,n2,nmax,l1,l2,lmax,total_size,proc_id,num_proc
+  integer             :: num_points,fd_l1,fd_l2,h5_err,comm,rank_size,stride
   character(len = 15) :: label ! File name without .h5 extension
   character(len = 12) :: psi_name
   character(len = 3)  :: strl! file number
   character(len = 6)  :: fmt ! format descriptor
   character(len = 24) :: file_name
-  PetscReal,   allocatable :: u(:,:,:),v1(:),v2(:),r(:)
-  PetscInt,    allocatable :: col(:)
+  PetscReal,   allocatable :: u(:,:,:),v1(:),v2(:),r(:),y(:,:)
+  PetscInt,    allocatable :: row(:),col(:)
   PetscScalar, allocatable :: val(:)
   real(dp),    allocatable:: clebsch_gordan(:)
   integer(HSIZE_T) :: psi_dims(1:2) 
@@ -74,6 +74,7 @@ program main
   h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
 
   allocate(u(num_points,nmax,0:lmax))
+  allocate(y(num_points,nmax))
   allocate(v1(num_points))
   allocate(v2(num_points))
   allocate(r(num_points))
@@ -96,24 +97,42 @@ program main
     psi_dims(1) = int(Rmax/h)
     psi_dims(2) = nmax-l
 
-    call h5dread_f( psi_id, h5_kind, u(1:num_points,1:nmax-l,l),  &
+    call h5dread_f( psi_id, h5_kind, y,  &
     & psi_dims, h5_err)
+
+    u(1:num_points,1:nmax-l,l) = y
 
     call h5dclose_f( psi_id, h5_err)
   end do
 
-  ! If we truncate the basis (set nmax > lmax + 1) then we set the size of
+  ! If we truncate the basis (set nmax > lmax + 1) then we set the total_size of
   ! Z differently  
   if(nmax .le. lmax+1) then 
-    size = (nmax - 1)*nmax/2 + lmax+ 1
+    total_size = (nmax - 1)*nmax/2 + lmax+ 1
   else
-    size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
+    total_size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
     & lmax + 1
   endif
   
+  if( num_proc < lmax) then
+    stride = ceiling( real(lmax)/num_proc)
+  else 
+    stride = 1
+  end if 
+
+  ! Compute the energy En and wfns for each angular momentum block.
+  ! Each processor will only compute a few of these blocks 
+  rank_size = 0
+  do l = proc_id*stride, min( (proc_id+1)*stride-1,lmax-1)
+    rank_size = rank_size + (nmax-l)*(nmax-l-1)
+  end do
+  print*,  rank_size
+  
   allocate(clebsch_gordan(lmax))
-  allocate(col(nmax))
-  allocate(val(nmax))
+  
+  allocate(row(rank_size))
+  allocate(col(rank_size))
+  allocate(val(rank_size))
  
 
 ! --------------------------------------------------------------------------
@@ -134,19 +153,10 @@ program main
 ! --------------------------------------------------------------------------
 ! Create Z matrix
 ! --------------------------------------------------------------------------
-  call MatCreate(PETSC_COMM_WORLD,Z,ierr)
-  CHKERRA(ierr)
-  call MatSetSizes(Z,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
-  CHKERRA(ierr)
-  call MatSetFromOptions(Z,ierr)
-  CHKERRA(ierr)
-  call MatSetUp(Z,ierr)
-  CHKERRA(ierr)
-  call MatGetOwnershipRange(Z,i_start,i_end,ierr)
-  CHKERRA(ierr)
- 
+
+  itter = 1
   ! Itterate over angular momentum to calculate half the matrix elements
-  do l = 0,lmax-1
+  do l = proc_id*stride, min( (proc_id+1)*stride-1,lmax-1)
     ! For linearly polarized pulses the only non-zero matrix elements are 
     ! for l+/-1
     ! we will compute the (l,l+1) elements only and take care of the rest 
@@ -164,7 +174,6 @@ program main
         & + 1) + l1
       endif
       ! Here I convert the n2 and l2 value to its corresponding index
-      itter = 1
       do n2=l2+1,nmax
         if(n2 .le. lmax+1) then
           right_index = (n2 - 1)*n2/2 + l2
@@ -174,6 +183,7 @@ program main
         endif
         ! I create a vector of indicies corresponding to what columns I 
         ! am setting for each row
+        row(itter) = left_index
         col(itter) = right_index
         
         ! Here I compute matrix elements of the r operator as a weighted 
@@ -183,20 +193,28 @@ program main
         rint = DOT_PRODUCT(v1,r*v2)
         ! Here I compute matrix elements corresponding to the indicies in 
         ! the col vector
-        val(itter) = dcmplx(2.0*((pi/3.0)**0.5)*clebsch_gordan(l1+1)*rint,0)
+        val(itter) = cmplx(2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint,0)
         itter = itter + 1
       enddo
-      ! Now that all matrix elements have been computed for the n1 state for
-      ! all n2 states I need to 
-      ! start again with the first n2 state and compute inner products with 
-      ! the nex n1 state
-      
-      call MatSetValues(Z,1,left_index,itter-1,col,val,INSERT_VALUES,ierr);&
-      & CHKERRA(ierr)
     enddo
-
   enddo
 
+
+  call MatCreate(PETSC_COMM_WORLD,Z,ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(Z,PETSC_DECIDE,PETSC_DECIDE,total_size,total_size,ierr)
+  CHKERRA(ierr)
+  call MatSetFromOptions(Z,ierr)
+  CHKERRA(ierr)
+  call MatSetUp(Z,ierr)
+  CHKERRA(ierr)
+  call MatGetOwnershipRange(Z,i_start,i_end,ierr)
+  CHKERRA(ierr)
+ 
+  do i = 1, rank_size
+    call MatSetValue(Z,row(i),col(i),val(i),INSERT_VALUES,ierr);&
+    & CHKERRA(ierr)
+  end do 
   ! We finish building Z now that we've finished adding elements
   call MatAssemblyBegin(Z,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)

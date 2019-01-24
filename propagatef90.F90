@@ -45,6 +45,10 @@ use simulation_parametersf90
     print*,'Unable to initialize PETSc'
     stop
   endif
+
+
+  nmax = n_max
+  lmax = l_max
   failures        = -1
   label = hdf5_file_label
   ! If nmax <= lmax+1 we chose the normal basis size but if it is large 

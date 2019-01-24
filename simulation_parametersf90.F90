@@ -23,8 +23,8 @@ module simulation_parametersf90
   real(dp),  parameter :: grid_space = 0.07d0  
   real(dp),  parameter :: R_min = 30.d0    
   real(dp),  parameter :: R_max = 1000.d0   
-  integer,   parameter :: n_max = 500      
-  integer,   parameter :: l_max = 50 
+  integer,   parameter :: n_max = 50      
+  integer,   parameter :: l_max = 10 
   real(dp),  parameter :: binary_search_tol = 1d-5  
   real(dp),  parameter :: refinement_tol = 1d-14    
   real(dp),  parameter :: E_max  = 1000.d0    
