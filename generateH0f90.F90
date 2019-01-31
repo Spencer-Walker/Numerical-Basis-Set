@@ -28,7 +28,7 @@ use simulation_parametersf90
   character(len = 25) :: data
   PetscScalar         :: val(1)
   integer(HSIZE_T)    :: ener_dims(1:1), psi_dims(1:2)
-  PetscReal, allocatable   :: u(:,:),E(:,:)
+  PetscReal, allocatable   :: u(:,:),E(:,:),El(:)
   PetscScalar, allocatable :: M(:,:)
   real(dp)  :: start_time, end_time, Rmax, h, Rces
 ! --------------------------------------------------------------------------
@@ -46,7 +46,7 @@ use simulation_parametersf90
   Rmax  = R_max
   label = hdf5_file_label 
   num_points = int(Rmax/h)
-  Rces  = 0.95d0*Rmax
+  Rces  = Rmax
   ces_point = int(Rces/h)
   print*, 'num_points', num_points
   
@@ -63,7 +63,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
 
   allocate(E(nmax,0:lmax),M(ces_point-1:num_points,ces_point-1:num_points))
-  allocate(u(num_points,nmax))
+  allocate(u(num_points,nmax),El(nmax))
 
   M(:,:) = 0.d0
  
@@ -148,7 +148,8 @@ use simulation_parametersf90
     ener_dims(1) = nmax-l
     
     ! Fills the lth column of E(:,:) with the energy data from the dataset
-    call h5dread_f( ener_id, h5_kind, E(1:nmax-l,l), ener_dims, h5_err) 
+    call h5dread_f( ener_id, h5_kind, El(1:nmax-l), ener_dims, h5_err) 
+    E(1:nmax-l,l) = El
     ! Closes the dataset
     call h5dclose_f( ener_id, h5_err)
     
@@ -171,9 +172,8 @@ use simulation_parametersf90
           index = (lmax + 1)*(lmax + 2)/2 + (n - lmax - 2)*(lmax + 1) &
           &	+ l
       endif    
-      
       ! Convert the real energy to a PetscScalar
-      val = E(n-l,l) + DOT_PRODUCT(u(ces_point-1:,n-l),MATMUL(M(ces_point-1:,ces_point-1:),u(ces_point-1:,n-l)))
+      val = E(n-l,l) !+ DOT_PRODUCT(u(ces_point-1:,n-l),MATMUL(M(ces_point-1:,ces_point-1:),u(ces_point-1:,n-l)))
       ! Insert the energy into the field free matrix 
       call MatSetValue(H0,index,index,val,INSERT_VALUES,ierr)
       CHKERRA(ierr)
@@ -195,8 +195,9 @@ use simulation_parametersf90
   call MatView(H0,viewer,ierr)
   CHKERRA(ierr)
 
+
   ! Clear memory 
-  deallocate(u,E,M)
+  deallocate(u,E,M,El)
   call MatDestroy(H0,ierr)
   CHKERRA(ierr)
   call h5fclose_f( file_id, h5_err)

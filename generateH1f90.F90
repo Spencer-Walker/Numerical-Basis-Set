@@ -14,7 +14,7 @@ program main
   PetscInt            :: i_start,i_end,left_index,right_index
   PetscViewer         :: view_l1,view_l2
   PetscReal           :: rint
-  PetscInt            :: i,j
+  PetscInt            :: i,j,added_rows,added_columns 
   integer(HID_T)      :: file_id, psi_id, h5_kind
   integer             :: l,itter,n1,n2,nmax,l1,l2,lmax,total_size,proc_id,num_proc
   integer             :: num_points,fd_l1,fd_l2,h5_err,comm,rank_size,stride
@@ -24,8 +24,8 @@ program main
   character(len = 6)  :: fmt ! format descriptor
   character(len = 24) :: file_name
   PetscReal,   allocatable :: u(:,:,:),v1(:),v2(:),r(:),y(:,:)
-  PetscInt,    allocatable :: row(:),col(:)
-  PetscScalar, allocatable :: val(:)
+  PetscInt,    allocatable :: row(:),col(:),unique_rows(:),unique_columns(:)
+  PetscScalar, allocatable :: val(:),vals(:)
   real(dp),    allocatable:: clebsch_gordan(:)
   integer(HSIZE_T) :: psi_dims(1:2) 
   real(dp) :: start_time, end_time
@@ -199,6 +199,10 @@ program main
     enddo
   enddo
 
+  call CPU_TIME(end_time)
+  
+  print 20, 'time   :', end_time-start_time
+
 
   call MatCreate(PETSC_COMM_WORLD,Z,ierr)
   CHKERRA(ierr)
@@ -208,20 +212,55 @@ program main
   CHKERRA(ierr)
   call MatSetUp(Z,ierr)
   CHKERRA(ierr)
-  call MatGetOwnershipRange(Z,i_start,i_end,ierr)
-  CHKERRA(ierr)
- 
-  do i = 1, rank_size
-    call MatSetValue(Z,row(i),col(i),val(i),INSERT_VALUES,ierr);&
-    & CHKERRA(ierr)
-  end do 
+
+  allocate(unique_rows(rank_size))
+  allocate(unique_columns(rank_size))
+  allocate(vals(rank_size))
+
+  unique_rows(:) = -1
+
+  added_rows = 0
+  do i = 1,rank_size
+    ADD_LOOP : do j = 1,added_rows+1
+      if (unique_rows(j)==row(i)) EXIT ADD_LOOP
+      if (unique_rows(j)== - 1) then
+        unique_rows(j) = row(i)
+        added_rows = added_rows+1
+        EXIT ADD_LOOP
+      end if
+    end do ADD_LOOP
+  end do
+
+  print*, 'building matrix'
+  added_columns = 0
+  UNIQUE_LOOP : do i = 1,rank_size
+    if (unique_rows(i)== -1 ) EXIT UNIQUE_LOOP
+    do j = 1,rank_size
+      if (row(j) == unique_rows(i)) then
+        added_columns = added_columns + 1
+        vals(added_columns) =  val(j)
+        unique_columns(added_columns) = col(j)
+      end if 
+      call MatSetValues(Z,1,unique_rows(i),added_columns,unique_columns(1:added_columns),vals(1:added_columns),INSERT_VALUES,ierr);&
+      & CHKERRA(ierr)
+      added_columns = 0
+    end do
+
+  end do UNIQUE_LOOP 
+
+  print*, added_rows
+
+  deallocate(row,col,val)
+
+  print*, 'assembling matrix'
   ! We finish building Z now that we've finished adding elements
   call MatAssemblyBegin(Z,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)
   call MatAssemblyEnd(Z,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)
-
-  ! Since we only added half the elements we can get the rest by adding Z to 
+  
+  print*, 'duplicating matrix'
+  ! Since we only added_rows half the elements we can get the rest by adding Z to 
   ! its conjugate transpose 
   call MatDuplicate(Z,MAT_DO_NOT_COPY_VALUES,ZH,ierr)
   CHKERRA(ierr)
@@ -230,6 +269,7 @@ program main
   call MatAXPY(Z,one,ZH,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
 
+  print*, 'saving matrix'
   ! We now save the complete Z matrix to a binary file on the disk
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//"_dipoleMatrix.bin",FILE_MODE_WRITE,view_l1,ierr)
@@ -242,8 +282,6 @@ program main
   
   call MatDestroy(Z,ierr)
   CHKERRA(ierr)
-  deallocate(val)
-  deallocate(col)
 
   deallocate(clebsch_gordan)
   deallocate(v1)

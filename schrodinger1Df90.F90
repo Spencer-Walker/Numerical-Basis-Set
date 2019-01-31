@@ -854,18 +854,14 @@ subroutine Get_basis( h, Rmin, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
   end if 
   call MPI_Barrier( MPI_COMM_WORLD, mpi_err)
 
-
-  ! The lmax+1 angular momentum blocks are split up between the 
-  ! num_proc processors 
-  if( num_proc < lmax + 1) then
-    stride = ceiling( real(lmax + 1)/num_proc)
+  if( num_proc < lmax+1) then
+    stride = ceiling( real(lmax+1)/num_proc)
   else 
     stride = 1
   end if 
 
-  ! Compute the energy En and wfns for each angular momentum block.
-  ! Each processor will only compute a few of these blocks 
   do l = proc_id*stride, min( (proc_id+1)*stride-1,lmax)
+
     ! Alocate space for the wavefunction
     allocate( u(int(Rmax/h), nmax-l))
     ! Allocate space for the energies

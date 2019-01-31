@@ -1,0 +1,15 @@
+#!/usr/bin/bash
+#PBS -l nodes=1:ppn=12
+#PBS -N timepropagation 
+#PBS -j oe
+#PBS -q photon13
+
+echo $HOSTNAME
+
+cd $PBS_O_WORKDIR
+
+
+echo $vec$end
+
+mpiexec -n 16 ./propagatef90
+
