@@ -23,10 +23,10 @@ module simulation_parametersf90
   real(dp),  parameter :: grid_space = 0.065d0  
   real(dp),  parameter :: R_min = 30.d0    
   real(dp),  parameter :: R_max = 1000.d0   
-  integer,   parameter :: n_max = 7
-  integer,   parameter :: l_max = 5
+  integer,   parameter :: n_max = 500
+  integer,   parameter :: l_max = 50
   real(dp),  parameter :: binary_search_tol = 1d-5  
-  real(dp),  parameter :: refinement_tol = 1d-12    
+  real(dp),  parameter :: refinement_tol = 1d-14  
   real(dp),  parameter :: E_max  = 1000.d0    
   real(dp),  parameter :: E_min  = -1.d0      
   integer,   parameter :: Z_nuc  = 1 
@@ -36,8 +36,8 @@ module simulation_parametersf90
   PetscReal, parameter :: num_cycles = 2.d0
   PetscReal, parameter :: Electric_field_strength = 0.053375290941998d0
 
-  PetscReal, parameter :: omega =  0.056953098011833d0
-  PetscReal, parameter :: period = (2.206441976474781d+02)/2.d0
+  PetscReal, parameter :: omega =   0.056953098011833d0
+  PetscReal, parameter :: period = 2.206441976474781d+02
 
   character(len = 15), parameter :: hdf5_file_label = 'H' 
   PetscScalar, parameter :: two = 2.d0

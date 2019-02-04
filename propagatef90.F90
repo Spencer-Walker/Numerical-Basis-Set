@@ -18,6 +18,7 @@ use simulation_parametersf90
 ! Declarations
 ! --------------------------------------------------------------------------
   KSP             :: ksp
+  PC              :: pc
   SNES            :: snes
   TS              :: ts
   PetscErrorCode  :: ierr
@@ -70,7 +71,7 @@ use simulation_parametersf90
   E0 = Electric_field_strength
   w  = omega
   T0 = period
-  max_time = numcycles*T0
+  max_time = numcycles*T0/2.d0
   print*,'E0 =',E0
   print*,' w =',w
   print*,'T0 =',T0
@@ -219,6 +220,10 @@ use simulation_parametersf90
   call SNESGetKSP(snes,ksp,ierr)
   CHKERRA(ierr)
   call KSPSetType(ksp,KSPGMRES,ierr)
+  CHKERRA(ierr)
+  call KSPGetPC(ksp,pc,ierr)
+  CHKERRA(ierr)
+  call KSPSetPC(ksp,pc,ierr)
   CHKERRA(ierr)
   call SNESSetKSP(snes,ksp,ierr)
   CHKERRA(ierr)

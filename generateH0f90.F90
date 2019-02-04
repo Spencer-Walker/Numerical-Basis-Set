@@ -195,6 +195,11 @@ use simulation_parametersf90
   call MatView(H0,viewer,ierr)
   CHKERRA(ierr)
 
+  do n = 1, 26
+    do l = 0,n-1
+      print*, n,E(n-l,l)
+    end do
+  end do 
 
   ! Clear memory 
   deallocate(u,E,M,El)

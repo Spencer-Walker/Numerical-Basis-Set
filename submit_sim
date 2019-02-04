@@ -1,6 +1,6 @@
 #!/usr/bin/bash
-#PBS -l nodes=1:ppn=12
-#PBS -N dipole&dipole_acceleration 
+#PBS -l nodes=1:ppn=6
+#PBS -N test 
 #PBS -j oe
 #PBS -q xeon
 
@@ -8,13 +8,19 @@ echo $HOSTNAME
 
 cd $PBS_O_WORKDIR
 
+num_proc=6
 
 echo $vec$end
 rm simulation_parametersf90.mod
 make simulation_parametersf90
-mpiexec -n 12 ./schrodinger1Df90
-mpiexec -n 12 ./generateH0f90
-mpiexec -n 12 ./generateH1f90
-mpiexec -n 12 ./generateDipoleAccelerationf90
-mpiexec -n 12 ./propagatef90
+make schrodinger1Df90
+make generateH0f90
+make generateH1f90
+make generateDipoleAccelerationf90
+make propagatef90
+mpiexec -n $num_proc ./schrodinger1Df90
+mpiexec -n $num_proc ./generateH0f90
+mpiexec -n $num_proc ./generateH1f90
+mpiexec -n $num_proc ./generateDipoleAccelerationf90
+mpiexec -n $num_proc ./propagatef90
 
