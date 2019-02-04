@@ -8,3 +8,10 @@ generateDipoleAccelerationf90
 propagatef90
 makefile
 *.mod
+*#*
+*.swp
+*OLD*
+*prop*
+*submit*
+*test*
+*timepropagation*
