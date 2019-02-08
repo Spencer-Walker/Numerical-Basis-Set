@@ -37,7 +37,7 @@ module simulation_parametersf90
   PetscReal, parameter :: Electric_field_strength = 0.053375290941998d0
 
   PetscReal, parameter :: omega =   0.056953098011833d0
-  PetscReal, parameter :: period = 2.206441976474781d+02
+  PetscReal, parameter :: max_time = 2.206441976474781d+02
 
   character(len = 15), parameter :: hdf5_file_label = 'H' 
   PetscScalar, parameter :: two = 2.d0

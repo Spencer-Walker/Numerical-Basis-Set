@@ -1,26 +1,69 @@
-#!/usr/bin/bash
-#PBS -l nodes=1:ppn=6
-#PBS -N test 
-#PBS -j oe
-#PBS -q xeon
+#!/bin/bash
+# This is a sample slurm job script for the JILA cluster
+# Edit below as required, but delete any lines you do not need
+# email unix@jila.colorado.edu with questions, or come see us
+#
+# Keep the # in front of the SBATCH lines or they won't work!  
 
-echo $HOSTNAME
+# A name for this job
+#SBATCH -J nmax_convergence_test
 
-cd $PBS_O_WORKDIR
+# The partition (queue) to run on: Choose from jila, long, slow and standby
+# You may also be eligible to choose nistq in some cases
+#SBATCH -p jila 
 
-num_proc=6
+# Number of processor cores required, e.g., 4
+#SBATCH -n 8
 
-echo $vec$end
+# Number of nodes to run on.  The JILA Cluster is not suitable for
+# spanning nodes (Summit, XSEDE, etc are good places to run these jobs)
+# so leave this set to 1
+#SBATCH -N 1
+
+# Maximum expected wall time this job will require
+# Format is DD-HH:MM:SS, this one will end in 15 seconds
+#SBATCH -t 24:0:0
+
+# Request email about this job: options include BEGIN, END, FAIL, ALL or NONE
+# Additionally, TIME_LIMIT_50, 80 or 90 will send email when the job reaches
+# 50%, 80% or 90% of the job walltime limit
+# Multiple options can be separated with a comma
+#SBATCH --mail-type=END,FAIL,TIME_LIMIT_90
+
+module load julia
+sleep 1
+module load mpich/3.2
+sleep 1
+module load hdf5
+sleep 1
+export PETSC_DIR=/users/becker/spwa4419/petsc
+sleep 1
+export SLEPC_DIR=/users/becker/spwa4419/slepc-3.10.1
+sleep 1
+export PETSC_ARCH=linux-gnu
+sleep 1
+num_proc=8
+sleep 1
 rm simulation_parametersf90.mod
+sleep 1 
 make simulation_parametersf90
+sleep 1
 make schrodinger1Df90
+sleep 1
 make generateH0f90
+sleep 1
 make generateH1f90
+sleep 1
 make generateDipoleAccelerationf90
+sleep 1
 make propagatef90
-mpiexec -n $num_proc ./schrodinger1Df90
-mpiexec -n $num_proc ./generateH0f90
-mpiexec -n $num_proc ./generateH1f90
-mpiexec -n $num_proc ./generateDipoleAccelerationf90
-mpiexec -n $num_proc ./propagatef90
-
+sleep 1
+mpirun -np $num_proc ./schrodinger1Df90
+sleep 1
+mpirun -np $num_proc ./generateH0f90
+sleep 1
+mpirun -np $num_proc ./generateH1f90
+sleep 1
+mpirun -np $num_proc ./generateDipoleAccelerationf90
+sleep 1
+mpirun -np $num_proc ./propagatef90

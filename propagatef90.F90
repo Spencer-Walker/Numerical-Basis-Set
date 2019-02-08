@@ -7,7 +7,6 @@ module dipole
   PetscReal, allocatable :: dipoleA(:)
 end module dipole
 
-
 program main
 use dipole 
 use simulation_parametersf90
@@ -32,7 +31,7 @@ use simulation_parametersf90
   PetscScalar     :: norm
   integer         :: nmax,lmax,size,num_grid_points
   PetscReal       :: E0,w,cep,T0,intensity,wavelength,numcycles,dt
-  PetscReal       :: h,r0,max_time
+  PetscReal       :: h,r0,maxtime
   character(len=15) :: label
   external        :: RHSMatrixSchrodinger
   parameter         (i_Z = 1, i_H0 = 2,i_A = 3)
@@ -46,7 +45,6 @@ use simulation_parametersf90
     print*,'Unable to initialize PETSc'
     stop
   endif
-
 
   nmax = n_max
   lmax = l_max
@@ -70,8 +68,9 @@ use simulation_parametersf90
   numcycles  = num_cycles
   E0 = Electric_field_strength
   w  = omega
-  T0 = period
-  max_time = numcycles*T0/2.d0
+  maxtime = max_time
+  T0 = max_time/num_cycles
+
   print*,'E0 =',E0
   print*,' w =',w
   print*,'T0 =',T0
@@ -204,10 +203,10 @@ use simulation_parametersf90
   CHKERRA(ierr)
 
   ! Here we set the maximum time maxtime
-  call TSSetMaxTime(ts,max_time,ierr)
+  call TSSetMaxTime(ts,maxtime,ierr)
   CHKERRA(ierr)
 
-  ! If max_time isnt an exact multiple of dt we just interpolate backwards
+  ! If maxtime isnt an exact multiple of dt we just interpolate backwards
   ! to get the value at this time
   call TSSetExactFinalTime(ts,TS_EXACTFINALTIME_INTERPOLATE,ierr)
   CHKERRA(ierr)
@@ -232,7 +231,7 @@ use simulation_parametersf90
   
   call TSGetMaxSteps(ts,max_steps,ierr)
   CHKERRA(ierr)
-  allocate(dipoleA(0:int(max_time/dt)))
+  allocate(dipoleA(0:int(maxtime/dt)))
   ! Now we finally solve the system 
   call TSSolve(ts,psi,ierr)
   CHKERRA(ierr)
@@ -290,7 +289,7 @@ function E(t)
   E0 = Electric_field_strength
   w  = omega
   cep = envelope_phase
-  T0 = period
+  T0 = max_time/num_cycles
   
   E = E0*sin(w*t+cep)*sin(pi*t/T0)**2.d0
   return
@@ -315,7 +314,7 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   PetscErrorCode  :: ierr
   PetscInt        :: i_Z,i_H0,i_A,size1,size2,step
   parameter (i_Z = 1, i_H0 = 2,i_A = 3)
-  T0    =  period
+  T0    =  max_time/num_cycles
   Z     =  user(i_Z)
   H0    =  user(i_H0)
   A     =  user(i_A)
