@@ -26,7 +26,7 @@ use simulation_parametersf90
   character(len = 30) :: file_name
   character(len = 12) :: ener_name, psi_name
   character(len = 25) :: data
-  PetscScalar         :: val(1)
+  PetscScalar         :: val(1), absorber
   integer(HSIZE_T)    :: ener_dims(1:1), psi_dims(1:2)
   PetscReal, allocatable   :: u(:,:),E(:,:),El(:)
   PetscScalar, allocatable :: M(:,:)
@@ -48,6 +48,13 @@ use simulation_parametersf90
   num_points = int(Rmax/h)
   Rces  = Rmax
   ces_point = int(Rces/h)
+
+  if (absorber_present) then
+    absorber = 1.d0
+  else 
+    absorber = 0.d0
+  end if 
+
   print*, 'num_points', num_points
   
 
@@ -173,7 +180,8 @@ use simulation_parametersf90
           &	+ l
       endif    
       ! Convert the real energy to a PetscScalar
-      val = E(n-l,l) !+ DOT_PRODUCT(u(ces_point-1:,n-l),MATMUL(M(ces_point-1:,ces_point-1:),u(ces_point-1:,n-l)))
+      val = E(n-l,l) + absorber*DOT_PRODUCT(u(ces_point-1:,n-l),  &
+      & MATMUL(M(ces_point-1:,ces_point-1:),u(ces_point-1:,n-l)))
       ! Insert the energy into the field free matrix 
       call MatSetValue(H0,index,index,val,INSERT_VALUES,ierr)
       CHKERRA(ierr)

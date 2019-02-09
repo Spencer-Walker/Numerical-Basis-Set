@@ -34,7 +34,7 @@ module simulation_parametersf90
   real(dp),  parameter :: binary_search_tol = 1d-5  
   real(dp),  parameter :: refinement_tol = 1d-14  
   real(dp),  parameter :: E_max  = 1000.d0    
-  real(dp),  parameter :: E_min  = -1.d0      
+  real(dp),  parameter :: E_min  = -0.6d0      
   
   ! Nuclear charge 
   integer,   parameter :: Z_nuc  = 1 
@@ -46,8 +46,11 @@ module simulation_parametersf90
   PetscReal, parameter :: num_cycles = 2.d0
   PetscReal, parameter :: max_time = 2.206441976474781d+02
 
+  ! Field free matrix 
+  logical, parameter :: absorber_present = .false.
+
   ! Laster perameters
-  PetscReal, parameter :: Electric_field_strength = 0.053375290941998d0
+  PetscReal, parameter :: electric_field_strength = 0.053375290941998d0
   PetscReal, parameter :: omega_electric_field = 0.056953098011833d0
 
   ! A name for the hdf5 file that the wfns and energy will be saved 2

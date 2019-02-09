@@ -1,5 +1,19 @@
-! This program loads the dipole matrix Z, and the field free hamiltonion  
-! and then propagates it waith Crank-Nicolson method
+!------------------------------------------------------------------------------
+! CU Boulder, Jila
+!------------------------------------------------------------------------------
+!
+! PROGRAM:  propagatef90.F90
+!
+!> Spencer.Walker@colorado.edu
+!> Spencer Walker
+!
+! DESCRIPTION: 
+!>  This program propagates the TDSE in time for a hydrogenlike atom in the 
+!   presence of a linearly polarized laser in the z direction. 
+!
+! REVISION HISTORY:
+! 22 01 2019 - Initial Version
+!------------------------------------------------------------------------------
 module time_propagation_module
 #include <petsc/finclude/petscts.h>
   use petscts
@@ -8,7 +22,86 @@ module time_propagation_module
   PetscReal, allocatable :: dipoleA(:)
 end module time_propagation_module
 
-program main
+! --------------------------------------------------------------------------
+! Functions
+! --------------------------------------------------------------------------
+! --------------------------- Evaluate E(t) --------------------------------
+function E(t)
+  ! This function computes the electric field at some given time 
+  use simulation_parametersf90
+  use time_propagation_module 
+  implicit none 
+  PetscReal       :: E0,wa,cep,T0,t,tcep
+  PetscScalar     :: E
+
+  E0 = electric_field_strength
+  wa  = omega_vector_potential
+  cep = envelope_phase
+  T0 = max_time/num_cycles
+  tcep = time_envelope_phase_set 
+
+  if (trim(envelope_function) == 'sin2') then
+    E = - E0*cos( wa*(t - tcep) + cep )*sin( pi*t/T0 )**2.d0 + & 
+    & ( pi*E0/(wa*T0) )*sin( wa*( t - tcep ) + cep )*sin( 2.d0*pi*t/T0 )
+
+  else if ( trim(envelope_function) == 'gaussian') then
+    E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) +  &
+    & (8d0*E0*(t-tcep)*log(2d0)/T0**2d0)*sin(wa*(t-tcep)+cep)*  &
+    & exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) 
+  end if
+
+  return
+endfunction E
+
+! --------------------------------------------------------------------------
+! Subroutines 
+! --------------------------------------------------------------------------
+! ----------------------- RHSMatrixSchrodinger -----------------------------
+subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
+  use petscts
+  use simulation_parametersf90
+  use time_propagation_module
+  implicit none
+  TS              :: ts
+  PetscReal       :: t,T0,real_part
+!  PetscReal, allocatable :: dipoleA(:)
+  Mat             :: user(3),Z,H0,A,J,BB
+  Vec             :: psi,tmp
+  PetscScalar     :: E,scale
+  PetscErrorCode  :: ierr
+  PetscInt        :: i_Z,i_H0,i_A,size1,size2,step
+  parameter (i_Z = 1, i_H0 = 2,i_A = 3)
+  T0    =  max_time/num_cycles
+  Z     =  user(i_Z)
+  H0    =  user(i_H0)
+  A     =  user(i_A)
+  scale =  cmplx(0.d0,-1.d0)
+  print*,t
+  call TSGetStepNumber(ts,step,ierr)
+  CHKERRA(ierr)
+  call VecDuplicate(psi,tmp,ierr)
+  CHKERRA(ierr)
+  call MatMult(A,psi,tmp,ierr)
+  CHKERRA(ierr)
+  call VecDotRealPart(psi,tmp,real_part,ierr)
+  CHKERRA(ierr)
+  dipoleA(step) =  real_part
+  call MatCopy(H0,J,DIFFERENT_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
+  call MatAXPY(J,+E(t),Z,DIFFERENT_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
+  call MatScale(J,scale,ierr)
+  CHKERRA(ierr)
+  
+  call VecDestroy(tmp,ierr)
+  CHKERRA(ierr)
+  return
+endsubroutine RHSMatrixSchrodinger
+
+! --------------------------------------------------------------------------
+! Main
+! --------------------------------------------------------------------------
+program Main
 use time_propagation_module 
 use simulation_parametersf90
 #include <petsc/finclude/petscts.h>
@@ -67,7 +160,7 @@ use simulation_parametersf90
   dt   = time_resolution
   cep  = envelope_phase
   numcycles  = num_cycles
-  E0 = Electric_field_strength
+  E0 = electric_field_strength
   we = omega_electric_field
   maxtime = max_time
   T0 = max_time/num_cycles
@@ -287,83 +380,8 @@ use simulation_parametersf90
   call MatDestroy(user(i_A),ierr)
   CHKERRA(ierr)
   call PetscFinalize(ierr)
-end program main
+end program Main
 
 
-! --------------------------------------------------------------------------
-! Functions
-! --------------------------------------------------------------------------
-! --------------------------- Evaluate E(t) --------------------------------
-function E(t)
-  ! This function computes the electric field at some given time 
-  use simulation_parametersf90
-  use time_propagation_module 
-  implicit none 
-  PetscReal       :: E0,wa,cep,T0,t,tcep
-  PetscScalar     :: E
-
-  E0 = Electric_field_strength
-  wa  = omega_vector_potential
-  cep = envelope_phase
-  T0 = max_time/num_cycles
-  tcep = time_envelope_phase_set 
-
-  if (trim(envelope_function) == 'sin2') then
-    E = - E0*cos( wa*(t - tcep) + cep )*sin( pi*t/T0 )**2.d0 + & 
-    & ( pi*E0/(wa*T0) )*sin( wa*( t - tcep ) + cep )*sin( 2.d0*pi*t/T0 )
-
-  else if ( trim(envelope_function) == 'gaussian') then
-    E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) +  &
-    & (8d0*E0*(t-tcep)*log(2d0)/T0**2d0)*sin(wa*(t-tcep)+cep)*  &
-    & exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) 
-  end if
-
-  return
-endfunction E
-
-! --------------------------------------------------------------------------
-! Subroutines 
-! --------------------------------------------------------------------------
-! ----------------------- RHSMatrixSchrodinger -----------------------------
-subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
-  use petscts
-  use simulation_parametersf90
-  use time_propagation_module
-  implicit none
-  TS              :: ts
-  PetscReal       :: t,T0,real_part
-!  PetscReal, allocatable :: dipoleA(:)
-  Mat             :: user(3),Z,H0,A,J,BB
-  Vec             :: psi,tmp
-  PetscScalar     :: E,scale
-  PetscErrorCode  :: ierr
-  PetscInt        :: i_Z,i_H0,i_A,size1,size2,step
-  parameter (i_Z = 1, i_H0 = 2,i_A = 3)
-  T0    =  max_time/num_cycles
-  Z     =  user(i_Z)
-  H0    =  user(i_H0)
-  A     =  user(i_A)
-  scale =  cmplx(0.d0,-1.d0)
-  print*,t
-  call TSGetStepNumber(ts,step,ierr)
-  CHKERRA(ierr)
-  call VecDuplicate(psi,tmp,ierr)
-  CHKERRA(ierr)
-  call MatMult(A,psi,tmp,ierr)
-  CHKERRA(ierr)
-  call VecDotRealPart(psi,tmp,real_part,ierr)
-  CHKERRA(ierr)
-  dipoleA(step) =  real_part
-  call MatCopy(H0,J,DIFFERENT_NONZERO_PATTERN,ierr)
-  CHKERRA(ierr)
-  call MatAXPY(J,+E(t),Z,DIFFERENT_NONZERO_PATTERN,ierr)
-  CHKERRA(ierr)
-  call MatScale(J,scale,ierr)
-  CHKERRA(ierr)
-  
-  call VecDestroy(tmp,ierr)
-  CHKERRA(ierr)
-  return
-endsubroutine RHSMatrixSchrodinger
 
 
