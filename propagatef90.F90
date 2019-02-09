@@ -1,14 +1,15 @@
 ! This program loads the dipole matrix Z, and the field free hamiltonion  
-! and then propagates it with Crank-Nicolson method
-module dipole
+! and then propagates it waith Crank-Nicolson method
+module time_propagation_module
 #include <petsc/finclude/petscts.h>
   use petscts
   implicit none
+  PetscReal :: omega_vector_potential
   PetscReal, allocatable :: dipoleA(:)
-end module dipole
+end module time_propagation_module
 
 program main
-use dipole 
+use time_propagation_module 
 use simulation_parametersf90
 #include <petsc/finclude/petscts.h>
   use petscts
@@ -26,16 +27,16 @@ use simulation_parametersf90
   PetscInt        :: i,i_start,i_end,i_Z,i_H0,i_A,failures,size1,size2
   PetscInt        :: max_Steps
   Vec             :: psi,r
-  PetscViewer     :: viewer
+  PetscViewer    :: viewer
   PetscMPIInt     :: rank 
   PetscScalar     :: norm
   integer         :: nmax,lmax,size,num_grid_points
-  PetscReal       :: E0,w,cep,T0,intensity,wavelength,numcycles,dt
-  PetscReal       :: h,r0,maxtime
+  PetscReal       :: E0,wa,cep,T0,intensity,wavelength,numcycles,dt
+  PetscReal       :: h,r0,maxtime,we,mu
   character(len=15) :: label
   external        :: RHSMatrixSchrodinger
   parameter         (i_Z = 1, i_H0 = 2,i_A = 3)
-  
+
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
@@ -48,7 +49,7 @@ use simulation_parametersf90
 
   nmax = n_max
   lmax = l_max
-  failures        = -1
+  failures    = -1
   label = hdf5_file_label
   ! If nmax <= lmax+1 we chose the normal basis size but if it is large 
   ! the basis is truncated in l
@@ -67,16 +68,30 @@ use simulation_parametersf90
   cep  = envelope_phase
   numcycles  = num_cycles
   E0 = Electric_field_strength
-  w  = omega
+  we = omega_electric_field
   maxtime = max_time
   T0 = max_time/num_cycles
 
-  print*,'E0 =',E0
-  print*,' w =',w
-  print*,'T0 =',T0
-  print*,'dt =',dt 
+  if ( trim(envelope_function) == 'sin2' ) then
+    mu = 4d0*asin(exp(-0.25d0))**2d0
+  else if( trim(envelope_function) == 'gaussian') then
+    mu = 8d0*log(2d0)/pi**2d0
+  else 
+    print*,'only sin2 and gaussian are supported'
+    stop
+  end if 
+
+  omega_vector_potential = 2d0*we/(1d0 + sqrt(1 + mu/num_cycles**2d0))
+  wa = omega_vector_potential
+
+  print*, 'E0 =',E0
+  print*, 'we =',we
+  print*, 'wa =',wa
+  print*, 'T0 =',T0
+  print*, 'dt =',dt 
 
   
+
 ! --------------------------------------------------------------------------
 ! Create Z matrix
 ! --------------------------------------------------------------------------
@@ -282,18 +297,28 @@ end program main
 function E(t)
   ! This function computes the electric field at some given time 
   use simulation_parametersf90
+  use time_propagation_module 
   implicit none 
-  PetscReal       :: E0,w,cep,T0,t
+  PetscReal       :: E0,wa,cep,T0,t,tcep
   PetscScalar     :: E
 
   E0 = Electric_field_strength
-  w  = omega
+  wa  = omega_vector_potential
   cep = envelope_phase
   T0 = max_time/num_cycles
-  
-  E = E0*sin(w*t+cep)*sin(pi*t/T0)**2.d0
-  return
+  tcep = time_envelope_phase_set 
 
+  if (trim(envelope_function) == 'sin2') then
+    E = - E0*cos( wa*(t - tcep) + cep )*sin( pi*t/T0 )**2.d0 + & 
+    & ( pi*E0/(wa*T0) )*sin( wa*( t - tcep ) + cep )*sin( 2.d0*pi*t/T0 )
+
+  else if ( trim(envelope_function) == 'gaussian') then
+    E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) +  &
+    & (8d0*E0*(t-tcep)*log(2d0)/T0**2d0)*sin(wa*(t-tcep)+cep)*  &
+    & exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) 
+  end if
+
+  return
 endfunction E
 
 ! --------------------------------------------------------------------------
@@ -303,7 +328,7 @@ endfunction E
 subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   use petscts
   use simulation_parametersf90
-  use dipole
+  use time_propagation_module
   implicit none
   TS              :: ts
   PetscReal       :: t,T0,real_part
@@ -331,7 +356,7 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   dipoleA(step) =  real_part
   call MatCopy(H0,J,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
-  call MatAXPY(J,-E(t),Z,DIFFERENT_NONZERO_PATTERN,ierr)
+  call MatAXPY(J,+E(t),Z,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   call MatScale(J,scale,ierr)
   CHKERRA(ierr)

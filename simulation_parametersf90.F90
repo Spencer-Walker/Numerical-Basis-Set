@@ -20,26 +20,42 @@ module simulation_parametersf90
   use slepceps
   implicit none
   integer,   parameter :: dp = kind(0.d0) 
+
+  ! Grid detials
   real(dp),  parameter :: grid_space = 0.065d0  
   real(dp),  parameter :: R_min = 30.d0    
   real(dp),  parameter :: R_max = 1000.d0   
-  integer,   parameter :: n_max = 500
-  integer,   parameter :: l_max = 50
+
+  ! Max energy level and angular momentum
+  integer,   parameter :: n_max = 10
+  integer,   parameter :: l_max = 5
+  
+  ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-5  
   real(dp),  parameter :: refinement_tol = 1d-14  
   real(dp),  parameter :: E_max  = 1000.d0    
   real(dp),  parameter :: E_min  = -1.d0      
+  
+  ! Nuclear charge 
   integer,   parameter :: Z_nuc  = 1 
 
+  ! Parameters for time propagation
   PetscReal, parameter :: time_resolution = 0.05d0
   PetscReal, parameter :: envelope_phase  = 0.d0
+  PetscReal, parameter :: time_envelope_phase_set = 0.d0
   PetscReal, parameter :: num_cycles = 2.d0
-  PetscReal, parameter :: Electric_field_strength = 0.053375290941998d0
-
-  PetscReal, parameter :: omega =   0.056953098011833d0
   PetscReal, parameter :: max_time = 2.206441976474781d+02
 
-  character(len = 15), parameter :: hdf5_file_label = 'H' 
+  ! Laster perameters
+  PetscReal, parameter :: Electric_field_strength = 0.053375290941998d0
+  PetscReal, parameter :: omega_electric_field = 0.056953098011833d0
+
+  ! A name for the hdf5 file that the wfns and energy will be saved 2
+  character(len = 15), parameter :: hdf5_file_label = 'H'
+  ! Pulse envelope function must be either 'sin2' or 'gaussian'
+  character(len = 15), parameter :: envelope_function = 'sin2' 
+
+  ! Some useful constants that show up often
   PetscScalar, parameter :: two = 2.d0
   PetscScalar, parameter :: one = 1.d0
   PetscReal, parameter   :: zero = 0.d0
