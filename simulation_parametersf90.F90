@@ -27,8 +27,8 @@ module simulation_parametersf90
   real(dp),  parameter :: R_max = 1000.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 10
-  integer,   parameter :: l_max = 5
+  integer,   parameter :: n_max = 5
+  integer,   parameter :: l_max = 1
   
   ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-5  

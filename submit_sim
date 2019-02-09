@@ -60,10 +60,10 @@ make propagatef90
 sleep 1
 mpirun -np $num_proc ./schrodinger1Df90
 sleep 1
-mpirun -np $num_proc ./generateH0f90
+mpirun -np $num_proc ./generateH0f90 -log_view
 sleep 1
-mpirun -np $num_proc ./generateH1f90
+mpirun -np $num_proc ./generateH1f90 -log_view
 sleep 1
-mpirun -np $num_proc ./generateDipoleAccelerationf90
+mpirun -np $num_proc ./generateDipoleAccelerationf90 -log_view
 sleep 1
-mpirun -np $num_proc ./propagatef90
+mpirun -np $num_proc ./propagatef90 -log_view

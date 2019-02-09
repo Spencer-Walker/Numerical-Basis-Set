@@ -18,6 +18,8 @@ module time_propagation_module
 #include <petsc/finclude/petscts.h>
   use petscts
   implicit none
+  Vec :: tmp
+  Mat :: Z,H0,A
   PetscReal :: omega_vector_potential
   PetscReal, allocatable :: dipoleA(:)
 end module time_propagation_module
@@ -65,21 +67,16 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   TS              :: ts
   PetscReal       :: t,T0,real_part
 !  PetscReal, allocatable :: dipoleA(:)
-  Mat             :: user(3),Z,H0,A,J,BB
-  Vec             :: psi,tmp
+  Mat             :: J,BB
+  integer         :: user
+  Vec             :: psi
   PetscScalar     :: E,scale
   PetscErrorCode  :: ierr
-  PetscInt        :: i_Z,i_H0,i_A,size1,size2,step
-  parameter (i_Z = 1, i_H0 = 2,i_A = 3)
+  PetscInt        :: size1,size2,step
   T0    =  max_time/num_cycles
-  Z     =  user(i_Z)
-  H0    =  user(i_H0)
-  A     =  user(i_A)
   scale =  cmplx(0.d0,-1.d0)
   print*,t
   call TSGetStepNumber(ts,step,ierr)
-  CHKERRA(ierr)
-  call VecDuplicate(psi,tmp,ierr)
   CHKERRA(ierr)
   call MatMult(A,psi,tmp,ierr)
   CHKERRA(ierr)
@@ -93,8 +90,6 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   call MatScale(J,scale,ierr)
   CHKERRA(ierr)
   
-  call VecDestroy(tmp,ierr)
-  CHKERRA(ierr)
   return
 endsubroutine RHSMatrixSchrodinger
 
@@ -115,12 +110,12 @@ use simulation_parametersf90
   SNES            :: snes
   TS              :: ts
   PetscErrorCode  :: ierr
-  Mat             :: user(3),J
+  Mat             :: J
   PetscBool       :: flg
-  PetscInt        :: i,i_start,i_end,i_Z,i_H0,i_A,failures,size1,size2
+  PetscInt        :: i,i_start,i_end,failures,size1,size2
   PetscInt        :: max_Steps
   Vec             :: psi,r
-  PetscViewer    :: viewer
+  PetscViewer     :: viewer
   PetscMPIInt     :: rank 
   PetscScalar     :: norm
   integer         :: nmax,lmax,size,num_grid_points
@@ -128,7 +123,7 @@ use simulation_parametersf90
   PetscReal       :: h,r0,maxtime,we,mu
   character(len=15) :: label
   external        :: RHSMatrixSchrodinger
-  parameter         (i_Z = 1, i_H0 = 2,i_A = 3)
+
 
 ! --------------------------------------------------------------------------
 ! Beginning of Program
@@ -192,20 +187,20 @@ use simulation_parametersf90
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,user(i_Z),ierr)
+  call MatCreate(MPI_COMM_WORLD,Z,ierr)
   CHKERRA(ierr)
-  call MatSetSizes(user(i_Z),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  call MatSetSizes(Z,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetFromOptions(user(i_Z),ierr)
+  call MatSetFromOptions(Z,ierr)
   CHKERRA(ierr)
-  call MatSetUp(user(i_Z),ierr)
+  call MatSetUp(Z,ierr)
   CHKERRA(ierr)
-  call MatGetOwnershipRange(user(i_Z),i_start,i_end,ierr)
+  call MatGetOwnershipRange(Z,i_start,i_end,ierr)
   CHKERRA(ierr)
-  call MatLoad(user(i_Z),viewer,ierr)
+  call MatLoad(Z,viewer,ierr)
   CHKERRA(ierr)
 
-  call MatGetSize(user(i_Z),size1,size2,ierr)
+  call MatGetSize(Z,size1,size2,ierr)
   
 ! --------------------------------------------------------------------------
 ! Create dipole acceleration matrix
@@ -214,20 +209,20 @@ use simulation_parametersf90
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,user(i_A),ierr)
+  call MatCreate(MPI_COMM_WORLD,A,ierr)
   CHKERRA(ierr)
-  call MatSetSizes(user(i_A),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  call MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetFromOptions(user(i_A),ierr)
+  call MatSetFromOptions(A,ierr)
   CHKERRA(ierr)
-  call MatSetUp(user(i_A),ierr)
+  call MatSetUp(A,ierr)
   CHKERRA(ierr)
-  call MatGetOwnershipRange(user(i_A),i_start,i_end,ierr)
+  call MatGetOwnershipRange(A,i_start,i_end,ierr)
   CHKERRA(ierr)
-  call MatLoad(user(i_A),viewer,ierr)
+  call MatLoad(A,viewer,ierr)
   CHKERRA(ierr)
 
-  call MatGetSize(user(i_A),size1,size2,ierr)
+  call MatGetSize(A,size1,size2,ierr)
   
 
 
@@ -238,17 +233,17 @@ use simulation_parametersf90
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,user(i_H0),ierr)
+  call MatCreate(MPI_COMM_WORLD,H0,ierr)
   CHKERRA(ierr)
-  call MatSetSizes(user(i_H0),PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  call MatSetSizes(H0,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetFromOptions(user(i_H0),ierr)
+  call MatSetFromOptions(H0,ierr)
   CHKERRA(ierr)
-  call MatSetUp(user(i_H0),ierr)
+  call MatSetUp(H0,ierr)
   CHKERRA(ierr)
-  call MatGetOwnershipRange(user(i_H0),i_start,i_end,ierr)
+  call MatGetOwnershipRange(H0,i_start,i_end,ierr)
   CHKERRA(ierr)
-  call MatLoad(user(i_H0),viewer,ierr)
+  call MatLoad(H0,viewer,ierr)
   CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
@@ -268,6 +263,8 @@ use simulation_parametersf90
 ! --------------------------------------------------------------------------
   ! Create the solution, and initial condition vector
   call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,size,psi,ierr)
+  CHKERRA(ierr)
+  call VecDuplicate(psi,tmp,ierr)
   CHKERRA(ierr)
 
   ! We want the electron to start in the 1s state so we set psi0(0) = 1
@@ -294,12 +291,12 @@ use simulation_parametersf90
   CHKERRA(ierr)
   
   ! We will provide the Jacobian matrix only. Petsc will find the RHS. 
-  call TSSetRHSFunction(ts,PETSC_NULL_VEC,TSComputeRHSFunctionLinear,user,&
-  & ierr)
+  call TSSetRHSFunction(ts,PETSC_NULL_VEC,TSComputeRHSFunctionLinear, &
+  & 0, ierr)
   CHKERRA(ierr)
 
   ! Now we will provide the Jacobian matrix
-  call TSSetRHSJacobian(ts,J,J,RHSMatrixSchrodinger,user,ierr)
+  call TSSetRHSJacobian(ts,J,J,RHSMatrixSchrodinger,0,ierr)
   CHKERRA(ierr)
 
   ! I'll set the initial time to be t = 0
@@ -373,11 +370,15 @@ use simulation_parametersf90
 ! --------------------------------------------------------------------------
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
-  call MatDestroy(user(i_H0),ierr)
+  call MatDestroy(H0,ierr)
   CHKERRA(ierr)
-  call MatDestroy(user(i_Z),ierr)
+  call MatDestroy(Z,ierr)
   CHKERRA(ierr)
-  call MatDestroy(user(i_A),ierr)
+  call MatDestroy(A,ierr)
+  CHKERRA(ierr)
+  call VecDestroy(psi,ierr)
+  CHKERRA(ierr)
+  call VecDestroy(tmp,ierr)
   CHKERRA(ierr)
   call PetscFinalize(ierr)
 end program Main
