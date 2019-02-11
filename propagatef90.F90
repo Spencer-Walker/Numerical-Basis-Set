@@ -19,7 +19,8 @@ module time_propagation_module
   use petscts
   implicit none
   Vec :: tmp
-  Mat :: Z,H0,A
+  PetscReal :: told 
+  Mat :: Z_scale,H0_scale,A
   PetscReal :: omega_vector_potential
   PetscReal, allocatable :: dipoleA(:)
 end module time_propagation_module
@@ -39,15 +40,15 @@ function E(t)
   E0 = electric_field_strength
   wa  = omega_vector_potential
   cep = envelope_phase
-  T0 = max_time/num_cycles
+  T0 = 2d0*pi/wa
   tcep = time_envelope_phase_set 
 
   if (trim(envelope_function) == 'sin2') then
-    E = - E0*cos( wa*(t - tcep) + cep )*sin( pi*t/T0 )**2.d0 + & 
+    E = - E0*cos( wa*(t - tcep) + cep )*sin( pi*t/T0 )**2.d0 - & 
     & ( pi*E0/(wa*T0) )*sin( wa*( t - tcep ) + cep )*sin( 2.d0*pi*t/T0 )
 
   else if ( trim(envelope_function) == 'gaussian') then
-    E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) +  &
+    E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) -  &
     & (8d0*E0*(t-tcep)*log(2d0)/T0**2d0)*sin(wa*(t-tcep)+cep)*  &
     & exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) 
   end if
@@ -65,16 +66,14 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   use time_propagation_module
   implicit none
   TS              :: ts
-  PetscReal       :: t,T0,real_part
-!  PetscReal, allocatable :: dipoleA(:)
+  PetscReal       :: t,real_part
   Mat             :: J,BB
   integer         :: user
   Vec             :: psi
   PetscScalar     :: E,scale
   PetscErrorCode  :: ierr
   PetscInt        :: size1,size2,step
-  T0    =  max_time/num_cycles
-  scale =  cmplx(0.d0,-1.d0)
+
   print*,t
   call TSGetStepNumber(ts,step,ierr)
   CHKERRA(ierr)
@@ -83,12 +82,12 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   call VecDotRealPart(psi,tmp,real_part,ierr)
   CHKERRA(ierr)
   dipoleA(step) =  real_part
-  call MatCopy(H0,J,DIFFERENT_NONZERO_PATTERN,ierr)
+  call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
-  call MatAXPY(J,+E(t),Z,DIFFERENT_NONZERO_PATTERN,ierr)
+  call MatAXPY(J,+(E(t)),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
-  call MatScale(J,scale,ierr)
-  CHKERRA(ierr)
+
+  told  = t
   
   return
 endsubroutine RHSMatrixSchrodinger
@@ -105,24 +104,24 @@ use simulation_parametersf90
 ! --------------------------------------------------------------------------
 ! Declarations
 ! --------------------------------------------------------------------------
-  KSP             :: ksp
-  PC              :: pc
-  SNES            :: snes
-  TS              :: ts
-  PetscErrorCode  :: ierr
-  Mat             :: J
-  PetscBool       :: flg
-  PetscInt        :: i,i_start,i_end,failures,size1,size2
-  PetscInt        :: max_Steps
-  Vec             :: psi,r
-  PetscViewer     :: viewer
-  PetscMPIInt     :: rank 
-  PetscScalar     :: norm
-  integer         :: nmax,lmax,size,num_grid_points
-  PetscReal       :: E0,wa,cep,T0,intensity,wavelength,numcycles,dt
-  PetscReal       :: h,r0,maxtime,we,mu
+  KSP               :: ksp
+  PC                :: pc
+  SNES              :: snes
+  TS                :: ts
+  PetscErrorCode    :: ierr
+  Mat               :: J
+  PetscBool         :: flg
+  PetscInt          :: i,i_start,i_end,failures,size1,size2
+  PetscInt          :: max_Steps
+  Vec               :: psi
+  PetscViewer       :: viewer
+  PetscMPIInt       :: rank 
+  PetscScalar       :: norm, scale, E
+  integer           :: nmax,lmax,size,num_grid_points
+  PetscReal         :: E0,wa,cep,T0,intensity,wavelength,numcycles,dt
+  PetscReal         :: h,r0,maxtime,we,mu
   character(len=15) :: label
-  external        :: RHSMatrixSchrodinger
+  external          :: RHSMatrixSchrodinger
 
 
 ! --------------------------------------------------------------------------
@@ -157,8 +156,6 @@ use simulation_parametersf90
   numcycles  = num_cycles
   E0 = electric_field_strength
   we = omega_electric_field
-  maxtime = max_time
-  T0 = max_time/num_cycles
 
   if ( trim(envelope_function) == 'sin2' ) then
     mu = 4d0*asin(exp(-0.25d0))**2d0
@@ -169,8 +166,12 @@ use simulation_parametersf90
     stop
   end if 
 
-  omega_vector_potential = 2d0*we/(1d0 + sqrt(1 + mu/num_cycles**2d0))
+  omega_vector_potential = 2d0*we/(1d0 + sqrt(1d0 + mu/num_cycles**2d0))
   wa = omega_vector_potential
+
+  T0 = 2d0*pi/wa
+
+  maxtime = T0*num_cycles
 
   print*, 'E0 =',E0
   print*, 'we =',we
@@ -178,30 +179,33 @@ use simulation_parametersf90
   print*, 'T0 =',T0
   print*, 'dt =',dt 
 
+  scale =  cmplx(0.d0,-1.d0)
   
 
 ! --------------------------------------------------------------------------
-! Create Z matrix
+! Create Z_scale matrix
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,Z,ierr)
+  call MatCreate(MPI_COMM_WORLD,Z_scale,ierr)
   CHKERRA(ierr)
-  call MatSetSizes(Z,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  call MatSetSizes(Z_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetFromOptions(Z,ierr)
+  call MatSetFromOptions(Z_scale,ierr)
   CHKERRA(ierr)
-  call MatSetUp(Z,ierr)
+  call MatSetUp(Z_scale,ierr)
   CHKERRA(ierr)
-  call MatGetOwnershipRange(Z,i_start,i_end,ierr)
+  call MatGetOwnershipRange(Z_scale,i_start,i_end,ierr)
   CHKERRA(ierr)
-  call MatLoad(Z,viewer,ierr)
+  call MatLoad(Z_scale,viewer,ierr)
+  CHKERRA(ierr)
+  call MatScale(Z_scale,scale,ierr)
+  CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
-  call MatGetSize(Z,size1,size2,ierr)
-  
 ! --------------------------------------------------------------------------
 ! Create dipole acceleration matrix
 ! --------------------------------------------------------------------------
@@ -221,29 +225,31 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call MatLoad(A,viewer,ierr)
   CHKERRA(ierr)
-
-  call MatGetSize(A,size1,size2,ierr)
-  
-
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
-! Create the H0 matrix
+! Create the H0_scale matrix
 ! --------------------------------------------------------------------------
 
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
-  call MatCreate(MPI_COMM_WORLD,H0,ierr)
+  call MatCreate(MPI_COMM_WORLD,H0_scale,ierr)
   CHKERRA(ierr)
-  call MatSetSizes(H0,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  call MatSetSizes(H0_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetFromOptions(H0,ierr)
+  call MatSetFromOptions(H0_scale,ierr)
   CHKERRA(ierr)
-  call MatSetUp(H0,ierr)
+  call MatSetUp(H0_scale,ierr)
   CHKERRA(ierr)
-  call MatGetOwnershipRange(H0,i_start,i_end,ierr)
+  call MatGetOwnershipRange(H0_scale,i_start,i_end,ierr)
   CHKERRA(ierr)
-  call MatLoad(H0,viewer,ierr)
+  call MatLoad(H0_scale,viewer,ierr)
+  CHKERRA(ierr)
+  call MatScale(H0_scale,scale,ierr)
+  CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
@@ -256,6 +262,11 @@ use simulation_parametersf90
   call MatSetFromOptions(J,ierr)
   CHKERRA(ierr)
   call MatSetUp(J,ierr)
+  CHKERRA(ierr)
+  call MatCopy(H0_scale,J,DIFFERENT_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
+  told = 0.d0
+  call MatAXPY(J,+E(told),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
@@ -346,11 +357,13 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call VecView(psi,viewer,ierr)
   CHKERRA(ierr)
-
   call VecAbs(psi,ierr)
   CHKERRA(ierr)
   call VecPointwiseMult(psi,psi,psi,ierr)
   CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
+
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
   & viewer,ierr)
   CHKERRA(ierr)
@@ -370,9 +383,9 @@ use simulation_parametersf90
 ! --------------------------------------------------------------------------
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
-  call MatDestroy(H0,ierr)
+  call MatDestroy(H0_scale,ierr)
   CHKERRA(ierr)
-  call MatDestroy(Z,ierr)
+  call MatDestroy(Z_scale,ierr)
   CHKERRA(ierr)
   call MatDestroy(A,ierr)
   CHKERRA(ierr)

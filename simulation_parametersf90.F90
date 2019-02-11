@@ -27,8 +27,8 @@ module simulation_parametersf90
   real(dp),  parameter :: R_max = 1000.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 5
-  integer,   parameter :: l_max = 1
+  integer,   parameter :: n_max = 500
+  integer,   parameter :: l_max = 50
   
   ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-5  
@@ -44,7 +44,6 @@ module simulation_parametersf90
   PetscReal, parameter :: envelope_phase  = 0.d0
   PetscReal, parameter :: time_envelope_phase_set = 0.d0
   PetscReal, parameter :: num_cycles = 2.d0
-  PetscReal, parameter :: max_time = 2.206441976474781d+02
 
   ! Field free matrix 
   logical, parameter :: absorber_present = .false.
