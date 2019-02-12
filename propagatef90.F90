@@ -39,13 +39,18 @@ function E(t)
 
   E0 = electric_field_strength
   wa  = omega_vector_potential
-  cep = envelope_phase
-  T0 = 2d0*pi/wa
-  tcep = time_envelope_phase_set 
-
+  T0 = num_cycles*2d0*pi/wa
+  if (custom_envalope_phase == .true.) then
+    cep = envelope_phase
+    tcep = time_envelope_phase_set 
+  else 
+    tcep = T0/2d0
+    cep  = tcep*wa
+  end if
+  
   if (trim(envelope_function) == 'sin2') then
-    E = - E0*cos( wa*(t - tcep) + cep )*sin( pi*t/T0 )**2.d0 - & 
-    & ( 2.d0*pi*E0/(wa*T0) )*sin( wa*( t - tcep ) + cep )*sin( 2.d0*pi*t/T0 )
+    E = -((E0*sin((pi*t)/T0)**2d0*(T0*wa*cos(cep + (t - tcep)*wa) + &
+    & 2d0*pi*tan((pi*t)/T0)**(-1d0)*sin(cep + (t - tcep)*wa)))/(T0*wa))
 
   else if ( trim(envelope_function) == 'gaussian') then
     E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) -  &
@@ -161,8 +166,10 @@ use simulation_parametersf90
     mu = 4d0*asin(exp(-0.25d0))**2d0
   else if( trim(envelope_function) == 'gaussian') then
     mu = 8d0*log(2d0)/pi**2d0
+    print*,'only sin2 is supported'
+    stop
   else 
-    print*,'only sin2 and gaussian are supported'
+    print*,'only sin2 is are supported'
     stop
   end if 
 

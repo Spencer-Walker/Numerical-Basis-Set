@@ -41,9 +41,11 @@ module simulation_parametersf90
 
   ! Parameters for time propagation
   PetscReal, parameter :: time_resolution = 0.05d0
+  PetscReal, parameter :: num_cycles = 2.d0
+  logical,   parameter :: custom_envalope_phase = .false.
+  ! If above is set to true the below values are used.   
   PetscReal, parameter :: envelope_phase  = 0.d0
   PetscReal, parameter :: time_envelope_phase_set = 0.d0
-  PetscReal, parameter :: num_cycles = 2.d0
 
   ! Field free matrix 
   logical, parameter :: absorber_present = .true.
