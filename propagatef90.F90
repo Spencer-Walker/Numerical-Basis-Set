@@ -49,8 +49,8 @@ function E(t)
   end if
   
   if (trim(envelope_function) == 'sin2') then
-    E = -((E0*sin((pi*t)/T0)**2d0*(T0*wa*cos(cep + (t - tcep)*wa) + &
-    & 2d0*pi*tan((pi*t)/T0)**(-1d0)*sin(cep + (t - tcep)*wa)))/(T0*wa))
+    E = E0*(-(cos(cep + (t - tcep)*wa)*sin((pi*t)/T0)**2d0) - &
+    & (2d0*pi*cos((pi*t)/T0)*sin((pi*t)/T0)*sin(cep + (t - tcep)*wa))/(T0*wa))
 
   else if ( trim(envelope_function) == 'gaussian') then
     E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) -  &
@@ -124,7 +124,7 @@ use simulation_parametersf90
   PetscScalar       :: norm, scale, E
   integer           :: nmax,lmax,size,num_grid_points
   PetscReal         :: E0,wa,cep,T0,intensity,wavelength,numcycles,dt
-  PetscReal         :: h,r0,maxtime,we,mu
+  PetscReal         :: h,r0,maxtime,we,mu,t
   character(len=15) :: label
   external          :: RHSMatrixSchrodinger
 
@@ -176,9 +176,9 @@ use simulation_parametersf90
   omega_vector_potential = 2d0*we/(1d0 + sqrt(1d0 + mu/num_cycles**2d0))
   wa = omega_vector_potential
 
-  T0 = 2d0*pi/wa
+  T0 = num_cycles*2d0*pi/wa
 
-  maxtime = T0*num_cycles
+  maxtime = T0
 
   print*, 'E0 =',E0
   print*, 'we =',we
@@ -187,7 +187,6 @@ use simulation_parametersf90
   print*, 'dt =',dt 
 
   scale =  cmplx(0.d0,-1.d0)
-  
 
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
