@@ -45,7 +45,7 @@ function E(t)
 
   if (trim(envelope_function) == 'sin2') then
     E = - E0*cos( wa*(t - tcep) + cep )*sin( pi*t/T0 )**2.d0 - & 
-    & ( pi*E0/(wa*T0) )*sin( wa*( t - tcep ) + cep )*sin( 2.d0*pi*t/T0 )
+    & ( 2.d0*pi*E0/(wa*T0) )*sin( wa*( t - tcep ) + cep )*sin( 2.d0*pi*t/T0 )
 
   else if ( trim(envelope_function) == 'gaussian') then
     E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) -  &

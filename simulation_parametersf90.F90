@@ -46,7 +46,7 @@ module simulation_parametersf90
   PetscReal, parameter :: num_cycles = 2.d0
 
   ! Field free matrix 
-  logical, parameter :: absorber_present = .false.
+  logical, parameter :: absorber_present = .true.
 
   ! Laster perameters
   PetscReal, parameter :: electric_field_strength = 0.053375290941998d0
