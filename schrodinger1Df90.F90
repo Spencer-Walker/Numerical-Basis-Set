@@ -22,7 +22,7 @@ subroutine Gram_schmidt( n, l, nmax, length, u)
   ! This subroutine orthogonalizes the set of eigenfunctions produced
   ! from this program.
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in) :: n,l,nmax,length
   ! Output
@@ -49,7 +49,7 @@ subroutine Init_mesh( num_points, R0, r)
   ! This subroutine initializes a uniformly spaced mesh with num_points
   ! between 0 and R0.
   implicit none
-  integer, parameter     :: dp = kind(1d0)! double precision
+  integer, parameter     :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)   :: num_points
   real(dp), intent(in)   :: R0
@@ -76,7 +76,7 @@ subroutine Init_pot( num_points, l, Znuc, r, V)
   ! This subroutine initializes the effective potential for the radial
   ! schrodinger equation for hydrogen.
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: num_points, l, Znuc
   real(dp), dimension(0:num_points+1), intent(in)  :: r
@@ -110,7 +110,7 @@ subroutine Turning_pt( num_points, r, l, E, Rm, im)
   ! Finds the classical turning point 
   ! This point will be used to match the left and right wfns 
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: num_points, l
   real(dp), intent(in)  :: E
@@ -121,9 +121,9 @@ subroutine Turning_pt( num_points, r, l, E, Rm, im)
 
   ! Finds the turning point
 
-  if (dble(1)+2d0*E*dble(l)*(dble(l)+1d0) >= 0) then
-    Rm  = max( ( -1d0 + sqrt(dble(1)+2d0*E*dble(l)*(dble(l)+1d0)))/(2d0*E)&
-    & ,(-1d0-sqrt(1d0+2d0*E*dble(l)*(dble(l)+1d0)))/(2d0*E))
+  if (dble(1)+2d0*E*dble(l)*(dble(l)+1.d0) >= 0) then
+    Rm  = max( ( -1.d0 + sqrt(dble(1)+2d0*E*dble(l)*(dble(l)+1.d0)))/(2d0*E)&
+    & ,(-1.d0-sqrt(1.d0+2d0*E*dble(l)*(dble(l)+1.d0)))/(2d0*E))
   else
     Rm = r(num_points+1)/2
   end if
@@ -144,7 +144,7 @@ subroutine Get_error( num_points, R0, im, yl, yr, error)
   !This function computes the logarithmic error between the two wfns
   !error = ( d (log u) - d (log v) )/h
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: num_points, im
   real(dp), intent(in)  :: R0
@@ -168,7 +168,7 @@ end subroutine Get_error
 function Dy( y, im, num_points)
   ! Finds the difference of y between points near im 
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in) :: num_points, im
   real(dp), dimension(0:num_points+1), intent(in) :: y
@@ -185,7 +185,7 @@ end function Dy
 subroutine Match_and_normalize( num_points, im, yl, yr, y)
   ! Matches the left and right wfns and normalizes the overall wfn y
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in) :: im, num_points
   real(dp), dimension(0:num_points+1), intent(in)  :: yr
@@ -219,7 +219,7 @@ subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
   ! to the turning pt (yr) and (3) finds the error btwn yl and yr and
   ! the turning pt.
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: l, num_points
   real(dp), intent(in)  :: E, R0
@@ -289,9 +289,9 @@ subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
   ! Integrate the rest of the values with the standard Numerov method
   do i = 3,im
     ! Finds the next value of yl
-    yl(i+1) = ( 2d0*( 1d0 - 5d0*Q(i)*h**2d0/12d0 )*yl(i)-&
-    & ( 1d0 + Q(i-1)*h**2d0/12d0)*yl(i-1))/&
-    & (1d0+Q(i+1)*h**2d0/12d0)
+    yl(i+1) = ( 2d0*( 1.d0 - 5d0*Q(i)*h**2d0/12d0 )*yl(i)-&
+    & ( 1.d0 + Q(i-1)*h**2d0/12d0)*yl(i-1))/&
+    & (1.d0+Q(i+1)*h**2d0/12d0)
 
     ! Counts the number of nodes
     if((yl(i+1)>0.and.(yl(i)<0.and.(yl(i-1)<0.and.(yl(i-2)<0.and.&
@@ -308,9 +308,9 @@ subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
   ! Generate values for the right wfn from i = num_pts,im
   do i = num_points,im,-1
     ! Finds the next value of yr
-    yr(i-1) = ( 2d0*( 1d0 - 5d0*Q(i)*h**2d0/12d0 )*yr(i)-&
-    & (1d0+Q(i+1)*h**2d0/12d0)*yr(i+1))/&
-    & (1d0+Q(i-1)*h**2d0/12d0)
+    yr(i-1) = ( 2d0*( 1.d0 - 5d0*Q(i)*h**2d0/12d0 )*yr(i)-&
+    & (1.d0+Q(i+1)*h**2d0/12d0)*yr(i+1))/&
+    & (1.d0+Q(i-1)*h**2d0/12d0)
     ! Counts the number of nodes
     if((yr(i-1)>0.and.(yr(i)<0.and.(yr(i+1)<0.and.(yr(i+2)<0.and.&
     & (yr(i+3)<0))))).or.&
@@ -344,7 +344,7 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
   ! This subroutine finds an upper and lower bound for possible energies
   ! which yield the correct number of nodes n-l-1 for the wfns
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,   intent(in)  :: n, l, num_points, im
   real(dp),  intent(in)  :: R0, Rm, dE
@@ -452,7 +452,7 @@ subroutine Get_correction( yl, yr, num_points, im, R0, E1)
   ! logarithm of the left and right wfns and matching them at
   ! the turning point.(See The Calculation of Atomic Structures by Hartree)
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   real(dp)  :: R0
   real(dp),   dimension(0:num_points+1), intent(in) :: yl, yr
@@ -495,7 +495,7 @@ subroutine Refine( n, l, num_points, R0, r, V, E, tol, y, error)
   ! we are allowed to treat the left and right wfns as variations of
   ! eachother, and are able to iteratively compute better energy estimates
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: n, l, num_points
   real(dp), intent(in)  :: R0, tol
@@ -552,7 +552,7 @@ subroutine Search( n, l, Znuc, num_points, R0, Emin, Emax, dE, tol, y, E)
   ! bisection to get a rough estimate and then use variations of the
   ! left and right wfns to compute additional refinements
   implicit none
-  integer, parameter :: dp = kind(1d0)! double precision
+  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,    intent(in)  :: n, l, num_points, Znuc
   real(dp),   intent(in)  :: dE, R0, tol
@@ -628,7 +628,7 @@ subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space, &
   use hdf5
   use mpi
   implicit none 
-  integer,  parameter  :: dp = kind(1d0)! double precision double precision
+  integer,  parameter  :: dp = kind(1.d0)! double precision double precision
   ! Input
   integer,  intent(in) :: nmax, lmax
   real(dp), intent(in) :: h, Rmax
@@ -771,7 +771,7 @@ subroutine Save_spectrum(l, nmax, lmax, Rmax, h, u, E, ener_dset, psi_dset,&
   use mpi
   use hdf5
   implicit none 
-  integer,  parameter   :: dp = kind(1d0)! double precision
+  integer,  parameter   :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: l, nmax, lmax
   real(dp), intent(in)  :: Rmax, h
@@ -814,7 +814,7 @@ subroutine Process_vec( n, l, nmax, num_points, Rmax, h, y, u)
   ! As each new energy En is computed the wfn yn is orthogonalized and 
   ! added to the matrix u 
   implicit none 
-  integer,  parameter     :: dp = kind(1d0)! double precision
+  integer,  parameter     :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)    :: n, nmax, num_points, l
   real(dp), intent(in)    :: h, Rmax
@@ -846,7 +846,7 @@ subroutine Get_basis( h, Rmin, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
   use hdf5
   use mpi
   implicit none 
-  integer, parameter   :: dp = kind(1d0)! double precision
+  integer, parameter   :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in) :: nmax, lmax, Znuc, proc_id, num_proc
   real(dp), intent(in) :: h, Rmin, Rmax, dE, tol
@@ -877,8 +877,7 @@ subroutine Get_basis( h, Rmin, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
     stride = 1
   end if 
 
-  !do l = proc_id*stride, min( (proc_id+1)*stride-1,lmax)
-  l = lmax
+  do l = proc_id*stride, min( (proc_id+1)*stride-1,lmax)
     ! Alocate space for the wavefunction
     allocate( u(int(Rmax/h), nmax-l))
     ! Allocate space for the energies
@@ -928,7 +927,7 @@ subroutine Get_basis( h, Rmin, nmax, lmax, Rmax, dE, tol, Emax, Emin, Znuc, &
     deallocate( u)
     deallocate( E)
 
-  !end do 
+  end do 
   call MPI_Barrier( MPI_COMM_WORLD, mpi_err)
 
   ! Bottom of n,l table 
