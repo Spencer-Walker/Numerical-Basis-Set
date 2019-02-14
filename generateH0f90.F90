@@ -180,9 +180,13 @@ use simulation_parametersf90
           &	+ l
       endif    
       ! Convert the real energy to a PetscScalar
-      val = E(n-l,l) + absorber*DOT_PRODUCT(u(ces_point-1:,n-l),  &
-      & MATMUL(M(ces_point-1:,ces_point-1:),u(ces_point-1:,n-l)))
-      ! Insert the energy into the field free matrix 
+      if (E(n-l,l) > energy_absorber) then
+        val = cmplx(0,-1d0)*E(n-l,l)
+      else 
+        val = E(n-l,l) + absorber*DOT_PRODUCT(u(ces_point-1:,n-l),  &
+        & MATMUL(M(ces_point-1:,ces_point-1:),u(ces_point-1:,n-l)))
+      end if 
+        ! Insert the energy into the field free matrix 
       call MatSetValue(H0,index,index,val,INSERT_VALUES,ierr)
       CHKERRA(ierr)
     enddo
