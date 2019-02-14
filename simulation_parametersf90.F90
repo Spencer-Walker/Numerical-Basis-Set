@@ -19,7 +19,7 @@ module simulation_parametersf90
 #include <slepc/finclude/slepceps.h>
   use slepceps
   implicit none
-  integer,   parameter :: dp = kind(0.d0) 
+  integer,   parameter :: dp = kind(1.d0) 
 
   ! Grid detials
   real(dp),  parameter :: grid_space = 0.065d0  
@@ -27,8 +27,8 @@ module simulation_parametersf90
   real(dp),  parameter :: R_max = 1000.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 500
-  integer,   parameter :: l_max = 50
+  integer,   parameter :: n_max = 1000
+  integer,   parameter :: l_max = 120
   
   ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-5  
