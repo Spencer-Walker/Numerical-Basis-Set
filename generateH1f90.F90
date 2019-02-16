@@ -153,7 +153,7 @@ program main
     CHKERRA(ierr)
    
     ! Itterate over angular momentum to calculate half the matrix elements
-    do l = 0,lmax-1
+    L_LOOP: do l = 0,lmax-1
       ! For linearly polarized pulses the only non-zero matrix elements are 
       ! for l+/-1
       ! we will compute the (l,l+1) elements only and take care of the rest 
@@ -163,23 +163,13 @@ program main
       l2 = l + 1
       ! For each l value we compute the corresponding matrix elements of Z
       do n1=l1+1,nmax
-        ! Here I convert the n1 and l1 value to its corresponding index 
-        if(n1 .le. lmax+1) then
-          left_index = (n1 - 1)*n1/2 + l1
-        else
-          left_index = (lmax + 1)*(lmax + 2)/2 + (n1 - lmax - 2)*(lmax &
-          & +1) + l1
-        endif
+        ! Here I convert the n1 and l1 value to its corresponding index
+        left_index = -1 + n1 - (l1*(1 + l1 - 2*nmax))/2.
         if (left_index <= i_end .and. left_index >= i_start) then 
           ! Here I convert the n2 and l2 value to its corresponding index
           itter = 1
           do n2=l2+1,nmax
-            if(n2 .le. lmax+1) then
-              right_index = (n2 - 1)*n2/2 + l2
-            else
-              right_index = (lmax + 1)*(lmax + 2)/2 + (n2 - lmax - 2)* &
-              & (lmax + 1) + l2
-            endif
+            right_index = -1 + n2 - (l2*(1 + l2 - 2*nmax))/2.
             ! I create a vector of indicies corresponding to what columns I 
             ! am setting for each row
             col(itter) = right_index
@@ -201,12 +191,14 @@ program main
           
           call MatSetValues(Z,1,left_index,itter-1,col,val,INSERT_VALUES,ierr)
           CHKERRA(ierr)
+        else if (left_index > i_end) then
+          exit L_LOOP
         end if 
-      enddo
+      end do
   
       ! Here I destroy the petsc viewers since we are going to move onto the 
       ! next l values
-    enddo
+    end do L_LOOP
   
     ! We finish building Z now that we've finished adding elements
     call MatAssemblyBegin(Z,MAT_FINAL_ASSEMBLY,ierr)

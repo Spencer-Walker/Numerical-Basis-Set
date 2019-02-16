@@ -49,7 +49,7 @@ module simulation_parametersf90
   PetscReal, parameter :: time_envelope_phase_set = 0.d0
 
   ! Field free matrix 
-  logical, parameter :: absorber_present = .true.
+  logical, parameter :: absorber_present = .false.
 
   ! Laster perameters
   PetscReal, parameter :: electric_field_strength = 0.053375290941998d0

@@ -173,12 +173,8 @@ use simulation_parametersf90
     
     do n=l+1,nmax    
       ! Here I convert the n and l value to its corresponding index 
-      if(n .le. lmax+1) then
-          index = (n - 1)*n/2 + l
-      else
-          index = (lmax + 1)*(lmax + 2)/2 + (n - lmax - 2)*(lmax + 1) &
-          &	+ l
-      endif    
+      index =  -1 + n - (l*(1 + l - 2*nmax))/2
+      print*,'index',index,'n',n,'l',l
       ! Convert the real energy to a PetscScalar
       if (E(n-l,l) > energy_absorber) then
         val = cmplx(0,-1d0)*E(n-l,l)
@@ -207,8 +203,8 @@ use simulation_parametersf90
   call MatView(H0,viewer,ierr)
   CHKERRA(ierr)
 
-!  call MatView(H0,PETSC_VIEWER_STDOUT_WORLD,ierr)
-!  CHKERRA(ierr)
+  call MatView(H0,PETSC_VIEWER_STDOUT_WORLD,ierr)
+  CHKERRA(ierr)
   ! Clear memory 
   deallocate(u,E,M,El)
   call MatDestroy(H0,ierr)
