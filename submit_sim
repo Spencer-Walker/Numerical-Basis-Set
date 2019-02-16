@@ -13,7 +13,7 @@
 #SBATCH -p jila 
 
 # Number of processor cores required, e.g., 4
-#SBATCH -n 16
+#SBATCH -n 8
 
 # Number of nodes to run on.  The JILA Cluster is not suitable for
 # spanning nodes (Summit, XSEDE, etc are good places to run these jobs)
@@ -26,7 +26,7 @@
 
 # How much RAM the job will require.  Make sure this is large enough, 
 # or the job will likely fail.  If you're not sure, estimate high.
-#SBATCH --mem=128G
+#SBATCH --mem=32G
 
 # Request email about this job: options include BEGIN, END, FAIL, ALL or NONE
 # Additionally, TIME_LIMIT_50, 80 or 90 will send email when the job reaches
@@ -46,7 +46,7 @@ export SLEPC_DIR=/users/becker/spwa4419/slepc-3.10.1
 sleep 1
 export PETSC_ARCH=linux-gnu
 sleep 1
-num_proc=16
+num_proc=8
 sleep 1
 rm simulation_parametersf90.mod
 sleep 1 

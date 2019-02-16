@@ -263,9 +263,9 @@ subroutine Itterate(l, num_points, R0, Rm, im, E, r, V, yl, yr, &
   end if
 
   ! If we're searching for a bound state use the asymtotic solution
-  !if(E<0) then
-  !  yr(num_points+1)= yr(num_points)*exp(-h*sqrt(-2.d0*E*h))
-  !end if
+  if(E<0) then
+    yr(num_points+1)= yr(num_points)*exp(-h*sqrt(-2.d0*E*h))
+  end if
 
   ! Define a RHS operator for the problem
   Q = (/( 2.d0*( E - V(i) ), i = 0,num_points + 1  )/)
