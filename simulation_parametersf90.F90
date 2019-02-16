@@ -24,7 +24,7 @@ module simulation_parametersf90
   ! Grid detials
   real(dp),  parameter :: grid_space = 0.065d0  
   real(dp),  parameter :: R_min = 30.d0    
-  real(dp),  parameter :: R_max = 1000.d0   
+  real(dp),  parameter :: R_max = 1500.d0   
 
   ! Max energy level and angular momentum
   integer,   parameter :: n_max = 500
@@ -33,9 +33,9 @@ module simulation_parametersf90
   ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-5  
   real(dp),  parameter :: refinement_tol = 1d-14  
-  real(dp),  parameter :: E_max  = 1000.d0    
+  real(dp),  parameter :: E_max  = 20.d0    
   real(dp),  parameter :: E_min  = -0.6d0      
-  real(dp),  parameter :: energy_absorber = 1.5d0
+  real(dp),  parameter :: energy_absorber = 100d0
   
   ! Nuclear charge 
   integer,   parameter :: Z_nuc  = 1 
