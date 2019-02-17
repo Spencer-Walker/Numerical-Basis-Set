@@ -9,7 +9,7 @@ program main
   ! Declarations
   ! --------------------------------------------------------------------------
     PetscErrorCode      :: ierr
-    Mat                 :: Z,ZH
+    Mat                 :: Z
     PetscReal           :: h,Rmax
     PetscInt            :: i_start,i_end,left_index,right_index
     PetscViewer         :: view_l1,view_l2
@@ -145,6 +145,8 @@ program main
     CHKERRA(ierr)
     call MatSetSizes(Z,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
     CHKERRA(ierr)
+    call MatSetType(Z,MATMPISBAIJ,ierr)
+    CHKERRA(ierr)
     call MatSetFromOptions(Z,ierr)
     CHKERRA(ierr)
     call MatSetUp(Z,ierr)
@@ -181,7 +183,7 @@ program main
             rint = DOT_PRODUCT(v1,r*v2)
             ! Here I compute matrix elements corresponding to the indicies in 
             ! the col vector
-            val(itter) = dcmplx(2.0*((pi/3.0)**0.5)*clebsch_gordan(l1+1)*rint,0)
+            val(itter) = cmplx(2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint,0)
             itter = itter + 1
           enddo
           ! Now that all matrix elements have been computed for the n1 state for
@@ -206,25 +208,16 @@ program main
     call MatAssemblyEnd(Z,MAT_FINAL_ASSEMBLY,ierr)
     CHKERRA(ierr)
   
-    ! Since we only added half the elements we can get the rest by adding Z to 
-    ! its conjugate transpose 
-    call MatDuplicate(Z,MAT_DO_NOT_COPY_VALUES,ZH,ierr)
-    CHKERRA(ierr)
-    call MatHermitianTranspose(Z,MAT_INITIAL_MATRIX,ZH,ierr)
-    CHKERRA(ierr)
-    call MatAXPY(Z,one,ZH,DIFFERENT_NONZERO_PATTERN,ierr)
-    CHKERRA(ierr)
-  
     ! We now save the complete Z matrix to a binary file on the disk
     call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
       & trim(label)//"_dipoleMatrix.bin",FILE_MODE_WRITE,view_l1,ierr);&
       CHKERRA(ierr)
     call MatView(Z,view_l1,ierr)
     CHKERRA(ierr)
-    call MatDestroy(ZH,ierr)
-    CHKERRA(ierr)
     ! Now that Z is saved to memory we clear out memory and exit
-    
+    call MatView(Z,PETSC_VIEWER_STDOUT_WORLD,ierr)
+    CHKERRA(ierr)
+
     call MatDestroy(Z,ierr)
     CHKERRA(ierr)
     deallocate(val)
