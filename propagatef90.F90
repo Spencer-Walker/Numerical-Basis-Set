@@ -18,7 +18,7 @@ module time_propagation_module
 #include <petsc/finclude/petscts.h>
   use petscts
   implicit none
-  Vec :: tmp
+  Vec :: tmp, mask_vector
   PetscReal :: told 
   Mat :: Z_scale,H0_scale,A
   PetscReal :: omega_vector_potential
@@ -78,7 +78,7 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   PetscScalar     :: E,scale
   PetscErrorCode  :: ierr
   PetscInt        :: size1,size2,step
-
+  PetscReal       :: val
   print*,t
   call TSGetStepNumber(ts,step,ierr)
   CHKERRA(ierr)
@@ -94,6 +94,12 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
 
   told  = t
   
+  call VecPointwiseMult(tmp, psi, mask_vector, ierr)
+  CHKERRA(ierr)
+
+  call TSSetSolution(ts, tmp, ierr)
+  CHKERRA(ierr)
+
   return
 endsubroutine RHSMatrixSchrodinger
 
@@ -121,17 +127,20 @@ use simulation_parametersf90
   Vec               :: psi
   PetscViewer       :: viewer
   PetscMPIInt       :: rank 
-  PetscScalar       :: norm, scale, E
-  integer           :: nmax,lmax,size,num_grid_points
+  PetscScalar       :: norm, scale, E, val
+  integer           :: nmax,lmax,size,num_grid_points,nabs,labs,index
+  integer           :: n,l
   PetscReal         :: E0,wa,cep,T0,intensity,wavelength,numcycles,dt
   PetscReal         :: h,r0,maxtime,we,mu,t
   character(len=15) :: label
   external          :: RHSMatrixSchrodinger
-
+  real(dp) :: start_time, end_time
 
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
+
+  call CPU_TIME(start_time)
 
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
@@ -141,6 +150,12 @@ use simulation_parametersf90
 
   nmax = n_max
   lmax = l_max
+
+  if (masking_function_present) then
+    nabs = n_abs
+    labs = l_abs
+  end if 
+
   failures    = -1
   label = hdf5_file_label
   ! If nmax <= lmax+1 we chose the normal basis size but if it is large 
@@ -287,9 +302,6 @@ use simulation_parametersf90
   ! Create the solution, and initial condition vector
   call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,size,psi,ierr)
   CHKERRA(ierr)
-  call VecDuplicate(psi,tmp,ierr)
-  CHKERRA(ierr)
-
   ! We want the electron to start in the 1s state so we set psi0(0) = 1
   call VecSetValue(psi,0,one,INSERT_VALUES,ierr)
   CHKERRA(ierr)
@@ -297,13 +309,44 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call VecAssemblyEnd(psi,ierr)
   CHKERRA(ierr)
+  call VecDuplicate(psi,tmp,ierr)
+  CHKERRA(ierr)
+
+
+  call VecDuplicate(psi,mask_vector,ierr)
+  CHKERRA(ierr)
+
+  ! Create the masking vector
+  if (masking_function_present) then
+    do l = 0,lmax
+      do n=l+1,nmax
+        index =  -1 + n - (l*(1 + l - 2*nmax))/2
+        ! We want the electron to start in the 1s state so we set psi0(0) = 1
+        if (l>=labs .and. n>=nabs) then 
+          val = abs(cos((dble(l + (labs - lmax))*pi)/(2.d0*dble(labs))))**0.125d0*  &
+          & abs(cos((dble(n + nabs - nmax)*pi)/(2.d0*dble(nabs))))**0.125d0 
+        else if (l>=labs) then
+          val = abs(cos(((l + labs - lmax)*pi)/(2.d0*labs)))**0.125d0
+        else if (n>=nabs) then 
+          val = abs(cos(((n + nabs - nmax)*pi)/(2.d0*nabs)))**0.125d0 
+        else 
+          val = 1d0
+        end if 
+        call VecSetValue(mask_vector,index,val,INSERT_VALUES,ierr)
+        CHKERRA(ierr)
+      end do
+    end do
+    
+    call VecAssemblyBegin(mask_vector,ierr) 
+    call VecAssemblyEnd(mask_vector,ierr)
+  end if 
 
   ! Create timestepper context where to compute solutions
   call TSCreate(PETSC_COMM_WORLD,ts,ierr)
   CHKERRA(ierr)
   call TSSetProblemType(ts,TS_LINEAR,ierr)
   CHKERRA(ierr)
-  
+
   ! Tell the timestepper context where to compute solutions
   call TSSetSolution(ts,psi,ierr)
   CHKERRA(ierr)
@@ -350,7 +393,11 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call KSPGetPC(ksp,pc,ierr)
   CHKERRA(ierr)
+  call PCSetType(pc,PCJACOBI,ierr)
+  CHKERRA(ierr)
   call KSPSetPC(ksp,pc,ierr)
+  CHKERRA(ierr)
+  call KSPSetPCSide(ksp,PC_SYMMETRIC,ierr)
   CHKERRA(ierr)
   call SNESSetKSP(snes,ksp,ierr)
   CHKERRA(ierr)
@@ -406,8 +453,10 @@ use simulation_parametersf90
   call VecDestroy(tmp,ierr)
   CHKERRA(ierr)
   call PetscFinalize(ierr)
+
+  call CPU_TIME(end_time)
+    
+  print*, 'time   :', end_time-start_time
+
+
 end program Main
-
-
-
-

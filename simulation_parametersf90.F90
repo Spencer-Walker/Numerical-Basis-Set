@@ -34,8 +34,7 @@ module simulation_parametersf90
   real(dp),  parameter :: binary_search_tol = 1d-4  
   real(dp),  parameter :: refinement_tol = 1d-12
   real(dp),  parameter :: E_max  = 20.d0    
-  real(dp),  parameter :: E_min  = -0.6d0      
-  real(dp),  parameter :: energy_absorber = 100d0
+  real(dp),  parameter :: E_min  = -0.6d0  
   
   ! Nuclear charge 
   integer,   parameter :: Z_nuc  = 1 
@@ -49,7 +48,12 @@ module simulation_parametersf90
   PetscReal, parameter :: time_envelope_phase_set = 0.d0
 
   ! Field free matrix 
-  logical, parameter :: absorber_present = .false.
+  logical, parameter :: ecs_present = .false.
+  logical, parameter :: masking_function_present = .true.
+  integer,   parameter :: n_abs = 375
+  integer,   parameter :: l_abs = 42
+  logical,   parameter :: energy_absorber_present = .false.    
+  real(dp),  parameter :: energy_absorber = 100d0
 
   ! Laster perameters
   PetscReal, parameter :: electric_field_strength = 0.053375290941998d0
@@ -65,4 +69,4 @@ module simulation_parametersf90
   PetscScalar, parameter :: one = 1.d0
   PetscReal, parameter   :: zero = 0.d0
   real(dp), parameter :: pi = 3.141592653589793238462643383279502884197169
-end module simulation_parametersf90
+  end module simulation_parametersf90

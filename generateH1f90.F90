@@ -215,9 +215,6 @@ program main
     call MatView(Z,view_l1,ierr)
     CHKERRA(ierr)
     ! Now that Z is saved to memory we clear out memory and exit
-    call MatView(Z,PETSC_VIEWER_STDOUT_WORLD,ierr)
-    CHKERRA(ierr)
-
     call MatDestroy(Z,ierr)
     CHKERRA(ierr)
     deallocate(val)

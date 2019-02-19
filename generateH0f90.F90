@@ -49,7 +49,7 @@ use simulation_parametersf90
   Rces  = Rmax
   ces_point = int(Rces/h)
 
-  if (absorber_present) then
+  if (ecs_present) then
     absorber = 1.d0
   else 
     absorber = 0.d0
@@ -174,7 +174,6 @@ use simulation_parametersf90
     do n=l+1,nmax    
       ! Here I convert the n and l value to its corresponding index 
       index =  -1 + n - (l*(1 + l - 2*nmax))/2
-      print*,'index',index,'n',n,'l',l
       ! Convert the real energy to a PetscScalar
       if (E(n-l,l) > energy_absorber) then
         val = cmplx(0,-1d0)*E(n-l,l)
@@ -203,8 +202,6 @@ use simulation_parametersf90
   call MatView(H0,viewer,ierr)
   CHKERRA(ierr)
 
-  call MatView(H0,PETSC_VIEWER_STDOUT_WORLD,ierr)
-  CHKERRA(ierr)
   ! Clear memory 
   deallocate(u,E,M,El)
   call MatDestroy(H0,ierr)
