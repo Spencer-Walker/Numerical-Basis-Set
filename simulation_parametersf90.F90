@@ -27,7 +27,7 @@ module simulation_parametersf90
   real(dp),  parameter :: R_max = 1000.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 500
+  integer,   parameter :: n_max = 1000
   integer,   parameter :: l_max = 50
   
   ! Tolerances needed for searching for energies 
@@ -48,12 +48,12 @@ module simulation_parametersf90
   PetscReal, parameter :: time_envelope_phase_set = 0.d0
 
   ! Field free matrix 
-  logical, parameter :: ecs_present = .false.
-  logical, parameter :: masking_function_present = .true.
-  integer,   parameter :: n_abs = 375
-  integer,   parameter :: l_abs = 42
-  logical,   parameter :: energy_absorber_present = .false.    
-  real(dp),  parameter :: energy_absorber = 100d0
+  logical,  parameter :: ecs_present = .false.
+  logical,  parameter :: masking_function_present = .true.
+  integer,  parameter :: n_abs = 950
+  integer,  parameter :: l_abs = 51
+  logical,  parameter :: energy_absorber_present = .false.    
+  real(dp), parameter :: energy_absorber = 100d0
 
   ! Laster perameters
   PetscReal, parameter :: electric_field_strength = 0.053375290941998d0

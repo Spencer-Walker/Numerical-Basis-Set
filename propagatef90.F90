@@ -18,11 +18,10 @@ module time_propagation_module
 #include <petsc/finclude/petscts.h>
   use petscts
   implicit none
-  Vec :: tmp, mask_vector
+  Vec :: tmp, mask_vector, dipoleA
   PetscReal :: told 
   Mat :: Z_scale,H0_scale,A
   PetscReal :: omega_vector_potential
-  PetscReal, allocatable :: dipoleA(:)
 end module time_propagation_module
 
 ! --------------------------------------------------------------------------
@@ -71,11 +70,11 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   use time_propagation_module
   implicit none
   TS              :: ts
-  PetscReal       :: t,real_part
+  PetscReal       :: t
   Mat             :: J,BB
   integer         :: user
   Vec             :: psi
-  PetscScalar     :: E,scale
+  PetscScalar     :: E,dotProduct
   PetscErrorCode  :: ierr
   PetscInt        :: size1,size2,step
   PetscReal       :: val
@@ -84,9 +83,10 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   CHKERRA(ierr)
   call MatMult(A,psi,tmp,ierr)
   CHKERRA(ierr)
-  call VecDotRealPart(psi,tmp,real_part,ierr)
+  call VecDot(psi,tmp,dotProduct,ierr)
   CHKERRA(ierr)
-  dipoleA(step) =  real_part
+  call VecSetValue(dipoleA,step,dotProduct,INSERT_VALUES,ierr)
+  CHKERRA(ierr)
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   call MatAXPY(J,+(E(t)),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
@@ -123,7 +123,7 @@ use simulation_parametersf90
   Mat               :: J
   PetscBool         :: flg
   PetscInt          :: i,i_start,i_end,failures,size1,size2
-  PetscInt          :: max_Steps
+  PetscInt          :: max_steps
   Vec               :: psi
   PetscViewer       :: viewer
   PetscMPIInt       :: rank 
@@ -311,8 +311,6 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call VecDuplicate(psi,tmp,ierr)
   CHKERRA(ierr)
-
-
   call VecDuplicate(psi,mask_vector,ierr)
   CHKERRA(ierr)
 
@@ -379,7 +377,7 @@ use simulation_parametersf90
 
   ! If maxtime isnt an exact multiple of dt we just interpolate backwards
   ! to get the value at this time
-  call TSSetExactFinalTime(ts,TS_EXACTFINALTIME_INTERPOLATE,ierr)
+  call TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP,ierr)
   CHKERRA(ierr)
 
   ! Here we set the KSP solver in SNES in TS
@@ -403,10 +401,14 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call TSSetSNES(ts,snes,ierr)
   CHKERRA(ierr)
+
   
-  call TSGetMaxSteps(ts,max_steps,ierr)
+  max_steps = ceiling(T0/dt) 
+
+  call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,max_steps,dipoleA,ierr)
   CHKERRA(ierr)
-  allocate(dipoleA(0:int(maxtime/dt)))
+  call VecSet(dipoleA,0d0*one,ierr)
+  CHKERRA(ierr)
   ! Now we finally solve the system 
   call TSSolve(ts,psi,ierr)
   CHKERRA(ierr)
@@ -423,6 +425,19 @@ use simulation_parametersf90
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
+  call VecAssemblyBegin(dipoleA,ierr)
+  call VecAssemblyEnd(dipoleA,ierr)
+
+  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAcceleration.output',&
+  & viewer,ierr)
+  CHKERRA(ierr)
+
+  call VecView(dipoleA,viewer,ierr)
+  CHKERRA(ierr)
+
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
+
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
   & viewer,ierr)
   CHKERRA(ierr)
@@ -433,13 +448,11 @@ use simulation_parametersf90
   print*,'Norm is',norm
 
 
-  open(10,file = trim(label)//'_dipoleAcceleration.output')
-  write(10,*) dipoleA(:)
-  close(10)
-  deallocate(dipoleA)
+
 ! --------------------------------------------------------------------------
 ! Clear memory
 ! --------------------------------------------------------------------------
+  print*,'before clear memory'
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
   call MatDestroy(H0_scale,ierr)
@@ -451,6 +464,8 @@ use simulation_parametersf90
   call VecDestroy(psi,ierr)
   CHKERRA(ierr)
   call VecDestroy(tmp,ierr)
+  CHKERRA(ierr)
+  call VecDestroy(dipoleA,ierr)
   CHKERRA(ierr)
   call PetscFinalize(ierr)
 
