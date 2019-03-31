@@ -75,8 +75,8 @@ end subroutine Init_mesh
 subroutine Init_pot( num_points, l, Znuc, r, V)
   ! This subroutine initializes the effective potential for the radial
   ! schrodinger equation for hydrogen.
+  use simulation_parametersf90
   implicit none
-  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: num_points, l, Znuc
   real(dp), dimension(0:num_points+1), intent(in)  :: r
@@ -88,13 +88,18 @@ subroutine Init_pot( num_points, l, Znuc, r, V)
   ! Sets the potential
   if(l /= 0) then
     do i = 1,num_points+1
-      V(i) = ( -1.d0 + 0.5d0*dble(l)*(dble(l) + Znuc)/r(i) )/r(i)
+      V(i) = -sae_c0/r(i) - (sae_Zc*dexp(-sae_c*r(i)))/r(i) - &
+      sae_a1*dexp(-sae_b1*r(i)) - sae_a2*dexp(-sae_b2*r(i)) - &
+      sae_a3*dexp(-sae_b3*r(i)) - sae_a4*dexp(-sae_b4*r(i)) - &
+      sae_a5*dexp(-sae_b5*r(i)) + 0.5d0*dble(l)*(dble(l) + 1.d0)/r(i)**2.d0 
 
     end do
   else
     do i = 1, num_points + 1
-      V(i) = -Znuc/r(i)
-
+      V(i) = -sae_c0/r(i) - (sae_Zc*dexp(-sae_c*r(i)))/r(i) - &
+      sae_a1*dexp(-sae_b1*r(i)) - sae_a2*dexp(-sae_b2*r(i)) - &
+      sae_a3*dexp(-sae_b3*r(i)) - sae_a4*dexp(-sae_b4*r(i)) - &
+      sae_a5*dexp(-sae_b5*r(i))
     end do
   end if
 
@@ -343,8 +348,8 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
   & Emin, Emax, min, max)
   ! This subroutine finds an upper and lower bound for possible energies
   ! which yield the correct number of nodes n-l-1 for the wfns
+  use simulation_parametersf90
   implicit none
-  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,   intent(in)  :: n, l, num_points, im
   real(dp),  intent(in)  :: R0, Rm, dE
@@ -384,8 +389,8 @@ subroutine Get_bounds( n, l, num_points, R0, Rm, im, r, V, yl, yr, dE, &
   end do
 
   ! Decrease Emin until the bottom of the appropiate doMain is found
-  if (Emin <-0.5d0-dE) then
-    Emin = -0.5d0-dE
+  if (Emin <E_lower-dE) then
+    Emin = E_lower -dE
 
   end if
 
@@ -667,7 +672,7 @@ subroutine Initialize( h, nmax, lmax, Rmax, label, file_id, ener_space, &
   call h5open_f( h5_err)
 
   ! Creates the hdf5 property list that will be used for the file 
-  ! (like an interface or c template)
+  ! (like an interface or sae_c template)
   call h5pcreate_f( H5P_FILE_ACCESS_F, plist_id, h5_err)
 
   ! Stores MPI IO communicator information to the file access property 
@@ -968,9 +973,8 @@ program Main
   dE    = binary_search_tol
   tol   = refinement_tol
   lmax  = l_max
-  Emax  = E_max
-  Emin  = E_min
-  Znuc  = Z_nuc
+  Emax  = E_upper
+  Emin  = E_lower
   label = hdf5_file_label
 
   ! If lmax is greater than nmax the program stops since these parameters 

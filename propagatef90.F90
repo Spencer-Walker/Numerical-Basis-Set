@@ -39,7 +39,7 @@ function E(t)
   E0 = electric_field_strength
   wa  = omega_vector_potential
   T0 = num_cycles*2d0*pi/wa
-  if (custom_envalope_phase == .true.) then
+  if (custom_envalope_phase .eqv. .true.) then
     cep = envelope_phase
     tcep = time_envelope_phase_set 
   else 
@@ -47,14 +47,14 @@ function E(t)
     cep  = tcep*wa
   end if
   
-  if (trim(envelope_function) == 'sin2') then
-    E = E0*(-(cos(cep + (t - tcep)*wa)*sin((pi*t)/T0)**2d0) - &
-    & (2d0*pi*cos((pi*t)/T0)*sin((pi*t)/T0)*sin(cep + (t - tcep)*wa))/(T0*wa))
+  if (trim(envelope_function) .eq. 'sin2') then
+    E = E0*(-(dcos(cep + (t - tcep)*wa)*dsin((pi*t)/T0)**2d0) - &
+    & (2d0*pi*dcos((pi*t)/T0)*dsin((pi*t)/T0)*dsin(cep + (t - tcep)*wa))/(T0*wa))
 
-  else if ( trim(envelope_function) == 'gaussian') then
-    E = -E0*cos(wa*(t-tcep)+cep)*exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) -  &
-    & (8d0*E0*(t-tcep)*log(2d0)/T0**2d0)*sin(wa*(t-tcep)+cep)*  &
-    & exp(-log(2d0)*((2d0*(t-tcep))/T0)**2d0) 
+  else if ( trim(envelope_function) .eq. 'gaussian') then
+    E = -E0*dcos(wa*(t-tcep)+cep)*dexp(-dlog(2d0)*((2d0*(t-tcep))/T0)**2d0) -  &
+    & (8d0*E0*(t-tcep)*dlog(2d0)/T0**2d0)*dsin(wa*(t-tcep)+cep)*  &
+    & dexp(-dlog(2d0)*((2d0*(t-tcep))/T0)**2d0) 
   end if
 
   return
@@ -76,8 +76,8 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   Vec             :: psi
   PetscScalar     :: E,dotProduct
   PetscErrorCode  :: ierr
-  PetscInt        :: size1,size2,step
-  PetscReal       :: val
+  PetscInt        :: step
+
   print*,t
   call TSGetStepNumber(ts,step,ierr)
   CHKERRA(ierr)
@@ -121,17 +121,15 @@ use simulation_parametersf90
   TS                :: ts
   PetscErrorCode    :: ierr
   Mat               :: J
-  PetscBool         :: flg
-  PetscInt          :: i,i_start,i_end,failures,size1,size2
+  PetscInt          :: i_start,i_end,failures
   PetscInt          :: max_steps
   Vec               :: psi
   PetscViewer       :: viewer
-  PetscMPIInt       :: rank 
   PetscScalar       :: norm, scale, E, val
   integer           :: nmax,lmax,size,num_grid_points,nabs,labs,index
   integer           :: n,l
-  PetscReal         :: E0,wa,cep,T0,intensity,wavelength,numcycles,dt
-  PetscReal         :: h,r0,maxtime,we,mu,t
+  PetscReal         :: E0,wa,cep,T0,numcycles,dt
+  PetscReal         :: h,r0,maxtime,we,mu
   character(len=15) :: label
   external          :: RHSMatrixSchrodinger
   real(dp) :: start_time, end_time
@@ -177,10 +175,10 @@ use simulation_parametersf90
   E0 = electric_field_strength
   we = omega_electric_field
 
-  if ( trim(envelope_function) == 'sin2' ) then
-    mu = 4d0*asin(exp(-0.25d0))**2d0
-  else if( trim(envelope_function) == 'gaussian') then
-    mu = 8d0*log(2d0)/pi**2d0
+  if ( trim(envelope_function) .eq. 'sin2' ) then
+    mu = 4d0*dasin(dexp(-0.25d0))**2d0
+  else if( trim(envelope_function) .eq. 'gaussian') then
+    mu = 8d0*dlog(2d0)/pi**2d0
     print*,'only sin2 is supported'
     stop
   else 
@@ -188,7 +186,7 @@ use simulation_parametersf90
     stop
   end if 
 
-  omega_vector_potential = 2d0*we/(1d0 + sqrt(1d0 + mu/num_cycles**2d0))
+  omega_vector_potential = 2d0*we/(1d0 + dsqrt(1d0 + mu/num_cycles**2d0))
   wa = omega_vector_potential
 
   T0 = num_cycles*2d0*pi/wa
@@ -201,7 +199,7 @@ use simulation_parametersf90
   print*, 'T0 =',T0
   print*, 'dt =',dt 
 
-  scale =  cmplx(0.d0,-1.d0)
+  scale =  dcmplx(0.d0,-1.d0)
 
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
@@ -321,12 +319,12 @@ use simulation_parametersf90
         index =  -1 + n - (l*(1 + l - 2*nmax))/2
         ! We want the electron to start in the 1s state so we set psi0(0) = 1
         if (l>=labs .and. n>=nabs) then 
-          val = abs(cos((dble(l + (labs - lmax))*pi)/(2.d0*dble(labs))))**0.125d0*  &
-          & abs(cos((dble(n + nabs - nmax)*pi)/(2.d0*dble(nabs))))**0.125d0 
+          val = abs(dcos((dble(l + (labs - lmax))*pi)/(2.d0*dble(labs))))**0.125d0*  &
+          & abs(dcos((dble(n + nabs - nmax)*pi)/(2.d0*dble(nabs))))**0.125d0 
         else if (l>=labs) then
-          val = abs(cos(((l + labs - lmax)*pi)/(2.d0*labs)))**0.125d0
+          val = abs(dcos(((l + labs - lmax)*pi)/(2.d0*labs)))**0.125d0
         else if (n>=nabs) then 
-          val = abs(cos(((n + nabs - nmax)*pi)/(2.d0*nabs)))**0.125d0 
+          val = abs(dcos(((n + nabs - nmax)*pi)/(2.d0*nabs)))**0.125d0 
         else 
           val = 1d0
         end if 

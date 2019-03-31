@@ -13,13 +13,13 @@ program main
   PetscReal           :: h,Rmax
   PetscInt            :: i_start,i_end,left_index,right_index,index
   PetscInt            :: l_i_start,l_i_end,n,l
-  PetscViewer         :: view_l1,view_l2
+  PetscViewer         :: viewer
   PetscMPIInt         :: proc_id, num_proc, comm 
   PetscReal           :: rint
-  PetscInt            :: i,j
+  PetscInt            :: i
   integer(HID_T)      :: file_id, psi_id, h5_kind
   integer             :: itter,n1,n2,nmax,l1,l2,lmax,size
-  integer             :: num_points,fd_l1,fd_l2, h5_err
+  integer             :: num_points, h5_err
   character(len = 15) :: label ! File name without .h5 extension
   character(len = 3)  :: strl! file number
   character(len = 12) :: psi_name
@@ -107,6 +107,7 @@ program main
   CHKERRA(ierr)
 
   l_i_start = -1
+  l_i_end = -1
   do l = 0,lmax-1
     do n=l+1,nmax
       index = -1 + n - (l*(1 + l - 2*nmax))/2
@@ -156,7 +157,7 @@ program main
 ! Create r Vector
 ! --------------------------------------------------------------------------
   r(:) = (/(i*h,i = 1,num_points)/)
-  r(:) = r(:)**-2.d0
+  r(:) = r(:)**(-2.d0)
 ! --------------------------------------------------------------------------
 ! Load in Clebsch Gordan Coefficients from .bin File
 ! --------------------------------------------------------------------------
@@ -180,12 +181,12 @@ program main
     ! For each l value we compute the corresponding matrix elements of Z
     do n1=l1+1,nmax
       ! Here I convert the n1 and l1 value to its corresponding index
-      left_index = -1 + n1 - (l1*(1 + l1 - 2*nmax))/2.
+      left_index = -1 + n1 - (l1*(1 + l1 - 2*nmax))/2
       if (left_index <= i_end .and. left_index >= i_start) then 
         ! Here I convert the n2 and l2 value to its corresponding index
         itter = 1
         do n2=l2+1,nmax
-          right_index = -1 + n2 - (l2*(1 + l2 - 2*nmax))/2.
+          right_index = -1 + n2 - (l2*(1 + l2 - 2*nmax))/2
           ! I create a vector of indicies corresponding to what columns I 
           ! am setting for each row
           col(itter) = right_index
@@ -197,9 +198,9 @@ program main
           rint = DOT_PRODUCT(v1,r*v2)
           ! Here I compute matrix elements corresponding to the indicies in 
           ! the col vector
-          val(itter) = cmplx(2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint,0)
+          val(itter) = dcmplx(2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint,0)
           itter = itter + 1
-        end do
+        enddo
         ! Now that all matrix elements have been computed for the n1 state for
         ! all n2 states I need to 
         ! start again with the first n2 state and compute inner products with 
@@ -224,9 +225,9 @@ program main
 
   ! We now save the complete Z matrix to a binary file on the disk
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-    & trim(label)//"_dipoleAccelerationMatrix.bin",FILE_MODE_WRITE,view_l1,ierr);&
-    CHKERRA(ierr)
-  call MatView(Z,view_l1,ierr)
+  trim(label)//"_dipoleAccelerationMatrix.bin",FILE_MODE_WRITE,viewer,ierr)
+  CHKERRA(ierr)
+  call MatView(Z,viewer,ierr)
   CHKERRA(ierr)
   ! Now that Z is saved to memory we clear out memory and exit
   call MatDestroy(Z,ierr)
