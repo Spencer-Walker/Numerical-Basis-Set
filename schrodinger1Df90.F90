@@ -114,8 +114,8 @@ end subroutine Init_pot
 subroutine Turning_pt( num_points, r, l, E, Rm, im)
   ! Finds the classical turning point 
   ! This point will be used to match the left and right wfns 
+  use simulation_parametersf90
   implicit none
-  integer, parameter :: dp = kind(1.d0)! double precision
   ! Input
   integer,  intent(in)  :: num_points, l
   real(dp), intent(in)  :: E
@@ -123,12 +123,16 @@ subroutine Turning_pt( num_points, r, l, E, Rm, im)
   ! Output
   real(dp), intent(out) :: Rm
   integer,  intent(out) :: im
+  ! Derived 
+  real(dp) :: desc,denom
 
   ! Finds the turning point
-
-  if (dble(1)+2d0*E*dble(l)*(dble(l)+1.d0) >= 0) then
-    Rm  = max( ( -1.d0 + sqrt(dble(1)+2d0*E*dble(l)*(dble(l)+1.d0)))/(2d0*E)&
-    & ,(-1.d0-sqrt(1.d0+2d0*E*dble(l)*(dble(l)+1.d0)))/(2d0*E))
+  denom = (sae_a1 + sae_a2 + sae_a3 + sae_a4 + sae_a5 + 2d0*E - 2d0*sae_c*sae_Zc)
+  
+  desc = (sae_c0 + sae_Zc)**2d0 + dble(l*(1 + l))*denom
+  
+  if (desc >= 0) then
+    Rm  = max(-((sae_c0 + sae_Zc - Sqrt(desc))/denom),-((sae_c0 + sae_Zc + Sqrt(desc))/denom))
   else
     Rm = r(num_points+1)/2
   end if

@@ -24,39 +24,39 @@ module simulation_parametersf90
   ! Grid detials
   real(dp),  parameter :: grid_space = 0.01d0  
   real(dp),  parameter :: R_min = 30.d0    
-  real(dp),  parameter :: R_max = 100.d0   
+  real(dp),  parameter :: R_max = 200.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 150
-  integer,   parameter :: l_max = 50
+  integer,   parameter :: n_max = 5
+  integer,   parameter :: l_max = 4
   
   ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-4  
   real(dp),  parameter :: refinement_tol = 1d-12
   real(dp),  parameter :: E_upper  = 100.d0    
-  real(dp),  parameter :: E_lower  = -1d0  
+  real(dp),  parameter :: E_lower  = -3d0  
   
   ! Nuclear charge 
   ! Coulomb
   real(dp),  parameter :: sae_c0 = 1.d0 
   ! Yukawa coef
-  real(dp),  parameter :: sae_Zc = 0d0
+  real(dp),  parameter :: sae_Zc = 53d0
   ! Yukawa exp
-  real(dp),  parameter :: sae_c = 0d0
+  real(dp),  parameter :: sae_c =  0.8918d0
   ! decay coef
-  real(dp),  parameter :: sae_a1 = 0d0
+  real(dp),  parameter :: sae_a1 = 0.1038d0
   ! decay exp
-  real(dp),  parameter :: sae_b1 = 0d0
+  real(dp),  parameter :: sae_b1 = 0
 
   ! additional decay 
-  real(dp),  parameter :: sae_a2 = 0d0
-  real(dp),  parameter :: sae_b2 = 0d0
-  real(dp),  parameter :: sae_a3 = 0d0
-  real(dp),  parameter :: sae_b3 = 0d0
-  real(dp),  parameter :: sae_a4 = 0d0
-  real(dp),  parameter :: sae_b4 = 0d0
-  real(dp),  parameter :: sae_a5 = 0d0
-  real(dp),  parameter :: sae_b5 = 0d0
+  real(dp),  parameter :: sae_a2 = -43.499d0
+  real(dp),  parameter :: sae_b2 = 1.2344
+  real(dp),  parameter :: sae_a3 = -67.4103d0
+  real(dp),  parameter :: sae_b3 = 3.4108d0
+  real(dp),  parameter :: sae_a4 = -104.9388d0
+  real(dp),  parameter :: sae_b4 = 12.477d0
+  real(dp),  parameter :: sae_a5 = 9.8008d0
+  real(dp),  parameter :: sae_b5 = 133.3545d0
 
   ! Parameters for time propagation
   PetscReal, parameter :: time_resolution = 0.05d0
@@ -81,7 +81,7 @@ module simulation_parametersf90
   PetscReal, parameter :: omega_electric_field = 0.056953098011833d0
 
   ! A name for the hdf5 file that the wfns and energy will be saved 2
-  character(len = 15), parameter :: hdf5_file_label = 'H'
+  character(len = 15), parameter :: hdf5_file_label = 'Li'
   ! Pulse envelope function must be either 'sin2' or 'gaussian'
   character(len = 15), parameter :: envelope_function = 'sin2' 
 
