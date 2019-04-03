@@ -21,14 +21,42 @@ module simulation_parametersf90
   implicit none
   integer,   parameter :: dp = kind(1.d0) 
 
+  ! Initial State
+  integer,   parameter :: n_init = 2
+  integer,   parameter :: l_init = 1
+
+  ! Blocking Pathways 
+  logical,   parameter :: block_pathways = .false.
+  logical,   parameter :: block_individual = .false.
+  logical,   parameter :: block_all_below_n_init = .false.
+
+
+  ! Laser perameters
+  PetscReal, parameter :: electric_field_strength =  0.053375290941998d0
+  PetscReal, parameter :: omega_electric_field = 0.056953098011833d0
+
+  ! Parameters for time propagation
+  PetscReal, parameter :: time_resolution = 0.005d0
+  PetscReal, parameter :: num_cycles = 4.d0
+  logical,   parameter :: custom_envalope_phase = .false.
+
+  ! If above is set to true the below values are used.   
+  PetscReal, parameter :: envelope_phase  = 0.d0
+  PetscReal, parameter :: time_envelope_phase_set = 0.d0
+
+  ! A name for the hdf5 file that the wfns and energy will be saved 2
+  character(len = 15), parameter :: hdf5_file_label = 'Ne'
+  ! Pulse envelope function must be either 'sin2' or 'gaussian'
+  character(len = 15), parameter :: envelope_function = 'sin2' 
+
   ! Grid detials
-  real(dp),  parameter :: grid_space = 0.01d0  
+  real(dp),  parameter :: grid_space = 0.065d0  
   real(dp),  parameter :: R_min = 30.d0    
-  real(dp),  parameter :: R_max = 200.d0   
+  real(dp),  parameter :: R_max = 100.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 5
-  integer,   parameter :: l_max = 4
+  integer,   parameter :: n_max = 200
+  integer,   parameter :: l_max = 150
   
   ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-4  
@@ -40,50 +68,31 @@ module simulation_parametersf90
   ! Coulomb
   real(dp),  parameter :: sae_c0 = 1.d0 
   ! Yukawa coef
-  real(dp),  parameter :: sae_Zc = 53d0
+  real(dp),  parameter :: sae_Zc = 9d0
   ! Yukawa exp
-  real(dp),  parameter :: sae_c =  0.8918d0
+  real(dp),  parameter :: sae_c =  2.0872d0
   ! decay coef
-  real(dp),  parameter :: sae_a1 = 0.1038d0
+  real(dp),  parameter :: sae_a1 = -5.4072d0
   ! decay exp
-  real(dp),  parameter :: sae_b1 = 0
+  real(dp),  parameter :: sae_b1 = 4.1537d0
 
   ! additional decay 
-  real(dp),  parameter :: sae_a2 = -43.499d0
-  real(dp),  parameter :: sae_b2 = 1.2344
-  real(dp),  parameter :: sae_a3 = -67.4103d0
-  real(dp),  parameter :: sae_b3 = 3.4108d0
-  real(dp),  parameter :: sae_a4 = -104.9388d0
-  real(dp),  parameter :: sae_b4 = 12.477d0
-  real(dp),  parameter :: sae_a5 = 9.8008d0
-  real(dp),  parameter :: sae_b5 = 133.3545d0
-
-  ! Parameters for time propagation
-  PetscReal, parameter :: time_resolution = 0.05d0
-  PetscReal, parameter :: num_cycles = 2.d0
-  logical,   parameter :: custom_envalope_phase = .false.
-  ! If above is set to true the below values are used.   
-  PetscReal, parameter :: envelope_phase  = 0.d0
-  PetscReal, parameter :: time_envelope_phase_set = 0.d0
+  real(dp),  parameter :: sae_a2 = 1.0374d0
+  real(dp),  parameter :: sae_b2 = 67.1114d0
+  real(dp),  parameter :: sae_a3 = 0d0
+  real(dp),  parameter :: sae_b3 = 0d0
+  real(dp),  parameter :: sae_a4 = 0d0
+  real(dp),  parameter :: sae_b4 = 0d0
+  real(dp),  parameter :: sae_a5 = 0d0
+  real(dp),  parameter :: sae_b5 = 0d0
 
   ! Field free matrix 
-  logical,  parameter :: ecs_present = .true.
-  real(dp), parameter :: gobbler = 0.7d0
+  logical,  parameter :: cap_present = .true.
+  real(dp), parameter :: V_max = 10.d0
+  real(dp), parameter :: gobbler = 0.5d0
   logical,  parameter :: masking_function_present = .true.
-  integer,  parameter :: n_abs = 75
-  integer,  parameter :: l_abs = 51
-  logical,  parameter :: energy_absorber_present = .false.    
-  real(dp), parameter :: energy_absorber = 100d0
-  real(dp), parameter :: V_max = 2.d0
-
-  ! Laster perameters
-  PetscReal, parameter :: electric_field_strength =  0.053375290941998d0
-  PetscReal, parameter :: omega_electric_field = 0.056953098011833d0
-
-  ! A name for the hdf5 file that the wfns and energy will be saved 2
-  character(len = 15), parameter :: hdf5_file_label = 'Li'
-  ! Pulse envelope function must be either 'sin2' or 'gaussian'
-  character(len = 15), parameter :: envelope_function = 'sin2' 
+  integer,  parameter :: n_abs = 100
+  integer,  parameter :: l_abs = 151
 
   ! Some useful constants that show up often
   PetscScalar, parameter :: two = 2.d0

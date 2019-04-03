@@ -127,7 +127,7 @@ use simulation_parametersf90
   PetscViewer       :: viewer
   PetscScalar       :: norm, scale, E, val
   integer           :: nmax,lmax,size,num_grid_points,nabs,labs,index
-  integer           :: n,l
+  integer           :: n,l,ninit,linit
   PetscReal         :: E0,wa,cep,T0,numcycles,dt
   PetscReal         :: h,r0,maxtime,we,mu
   character(len=15) :: label
@@ -146,6 +146,8 @@ use simulation_parametersf90
     stop
   endif
 
+  ninit = n_init
+  linit = l_init
   nmax = n_max
   lmax = l_max
 
@@ -301,7 +303,8 @@ use simulation_parametersf90
   call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,size,psi,ierr)
   CHKERRA(ierr)
   ! We want the electron to start in the 1s state so we set psi0(0) = 1
-  call VecSetValue(psi,0,one,INSERT_VALUES,ierr)
+  index =  -1 + ninit - (linit*(1 + linit - 2*nmax))/2
+  call VecSetValue(psi,index,one,INSERT_VALUES,ierr)
   CHKERRA(ierr)
   call VecAssemblyBegin(psi,ierr)
   CHKERRA(ierr)
@@ -349,7 +352,7 @@ use simulation_parametersf90
 
   ! Tell the timestepper context what type of solver to use. I'll use 
   ! Crank-Nicolson, but this can be changed via a command line option
-  call TSSetType(ts,TSCN,ierr)
+  call TSSetType(ts,TSTHETA,ierr)
   CHKERRA(ierr)
   
   ! We will provide the Jacobian matrix only. Petsc will find the RHS. 

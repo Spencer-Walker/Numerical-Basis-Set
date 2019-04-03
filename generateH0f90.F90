@@ -18,7 +18,7 @@ use simulation_parametersf90
   PetscViewer         :: viewer
   PetscMPIInt         :: proc_id, num_proc, comm 
   integer             :: l, n1, n2, nmax, lmax, size, left_index, h5_err, num_points
-  integer             :: ecs_point, itter
+  integer             :: cap_point, itter
   character(len = 15) :: label ! File name without .h5 extension
   character(len = 3)  :: strl  ! file number (l converted to a string)
   character(len = 6)  :: fmt   ! format descriptor
@@ -30,7 +30,7 @@ use simulation_parametersf90
   PetscInt,    allocatable :: col(:),indicies(:)
   integer(HSIZE_T)    :: ener_dims(1:1), psi_dims(1:2)
   PetscReal, allocatable   :: u(:,:),E(:,:),El(:)
-  real(dp)  :: start_time, end_time, Rmax, h, Recs
+  real(dp)  :: start_time, end_time, Rmax, h, Rcap
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
@@ -52,8 +52,8 @@ use simulation_parametersf90
   Rmax  = R_max
   label = hdf5_file_label 
   num_points = int(Rmax/h)
-  Recs  = gobbler*Rmax
-  ecs_point = int(Recs/h)
+  Rcap  = gobbler*Rmax
+  cap_point = int(Rcap/h)
 
   print*, 'num_points', num_points
   
@@ -63,7 +63,7 @@ use simulation_parametersf90
   call MPI_Comm_size(comm,num_proc,ierr)
   CHKERRA(ierr)
 
-  if (ecs_present) then
+  if (cap_present) then
     absorber = 1.d0
   else 
     absorber = 0.d0
@@ -85,17 +85,17 @@ use simulation_parametersf90
   call VecDuplicate(yl,tmp,ierr)
   CHKERRA(ierr)
 
-  if (ecs_present) then
+  if (cap_present) then
     allocate(col(1),val(1))
 
-    width = (R_max - Recs)/3.d0
+    width = (R_max - Rcap)/3.d0
     sig = 1.859d0
 
     do i = 1, num_points
 
       col(1) = i - 1
 
-      val(1) = dcmplx(0,-V_max*(dtanh(sig*(dble(i)*h-Recs)/width-sig)+1.d0)/2.d0)
+      val(1) = dcmplx(0,-V_max*(dtanh(sig*(dble(i)*h-Rcap)/width-sig)+1.d0)/2.d0)
       
       call MatSetValues(W,1,i-1,1,col,val,INSERT_VALUES,ierr)
       CHKERRA(ierr)
@@ -227,7 +227,7 @@ use simulation_parametersf90
       left_index =  -1 + n1 - (l*(1 + l - 2*nmax))/2
       ! Convert the real energy to a PetscScalar
       
-      if (ecs_present) then 
+      if (cap_present) then 
         itter = 1
         n2 = n1
         col(itter) =  -1 + n2 - (l*(1 + l - 2*nmax))/2
@@ -262,12 +262,8 @@ use simulation_parametersf90
         call MatSetValues(H0,1,left_index,itter-1,col,val,INSERT_VALUES,ierr)
         CHKERRA(ierr)
       else 
-        if (E(n1-l,l) > energy_absorber) then
-          val(1) = dcmplx(0,-1d0)*E(n1-l,l)
-        else 
-          val(1) = E(n1-l,l) 
-        end if 
-          ! Insert the energy into the field free matrix 
+        val(1) = E(n1-l,l)  
+        ! Insert the energy into the field free matrix 
         call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
         CHKERRA(ierr)
       end if 
