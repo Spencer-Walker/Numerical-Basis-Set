@@ -36,7 +36,7 @@ module simulation_parametersf90
   PetscReal, parameter :: omega_electric_field = 0.056953098011833d0
 
   ! Parameters for time propagation
-  PetscReal, parameter :: time_resolution = 0.01d0
+  PetscReal, parameter :: time_resolution = 0.05d0
   PetscReal, parameter :: num_cycles = 4.d0
   logical,   parameter :: custom_envalope_phase = .false.
 
@@ -52,10 +52,10 @@ module simulation_parametersf90
   ! Grid detials
   real(dp),  parameter :: grid_space = 0.01d0  
   real(dp),  parameter :: R_min = 50.d0    
-  real(dp),  parameter :: R_max = 1000.d0   
+  real(dp),  parameter :: R_max = 300.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 1000
+  integer,   parameter :: n_max = 800
   integer,   parameter :: l_max = 120
   
   ! Tolerances needed for searching for energies 
@@ -87,8 +87,8 @@ module simulation_parametersf90
   real(dp),  parameter :: sae_b5 = 0d0
 
   ! Field free matrix 
-  logical,  parameter :: cap_present = .true.
-  real(dp), parameter :: V_max = 5.d0
+  logical,  parameter :: cap_present = .false.
+  real(dp), parameter :: V_max = 1.d0
   real(dp), parameter :: gobbler = 0.95d0
   logical,  parameter :: masking_function_present = .true.
   integer,  parameter :: n_abs = 950
