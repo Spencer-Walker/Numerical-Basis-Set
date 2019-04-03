@@ -52,10 +52,10 @@ module simulation_parametersf90
   ! Grid detials
   real(dp),  parameter :: grid_space = 0.01d0  
   real(dp),  parameter :: R_min = 50.d0    
-  real(dp),  parameter :: R_max = 100.d0   
+  real(dp),  parameter :: R_max = 1000.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 500
+  integer,   parameter :: n_max = 1000
   integer,   parameter :: l_max = 120
   
   ! Tolerances needed for searching for energies 
@@ -89,9 +89,9 @@ module simulation_parametersf90
   ! Field free matrix 
   logical,  parameter :: cap_present = .true.
   real(dp), parameter :: V_max = 5.d0
-  real(dp), parameter :: gobbler = 0.8d0
+  real(dp), parameter :: gobbler = 0.95d0
   logical,  parameter :: masking_function_present = .true.
-  integer,  parameter :: n_abs = 490
+  integer,  parameter :: n_abs = 950
   integer,  parameter :: l_abs = 151
 
   ! Some useful constants that show up often
