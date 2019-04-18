@@ -322,12 +322,12 @@ use simulation_parametersf90
         index =  -1 + n - (l*(1 + l - 2*nmax))/2
         ! We want the electron to start in the 1s state so we set psi0(0) = 1
         if (l>=labs .and. n>=nabs) then 
-          val = abs(dcos((dble(l + (labs - lmax))*pi)/(2.d0*dble(labs))))**0.125d0*  &
-          & abs(dcos((dble(n + nabs - nmax)*pi)/(2.d0*dble(nabs))))**0.125d0 
+          val = abs(dcos((dble(l - labs))*pi)/(2.d0*dble(lmax-labs))))**0.125d0*  &
+          & abs(dcos((dble(n - nabs)*pi)/(2.d0*dble(nmax-nabs))))**0.125d0 
         else if (l>=labs) then
-          val = abs(dcos(((l + labs - lmax)*pi)/(2.d0*labs)))**0.125d0
+          val = abs(dcos(((l - labs)*pi)/(2.d0*dble(lmax-labs))))**0.125d0
         else if (n>=nabs) then 
-          val = abs(dcos(((n + nabs - nmax)*pi)/(2.d0*nabs)))**0.125d0 
+          val = abs(dcos(((n - nabs )*pi)/(2.d0*dble(nmax-nabs))))**0.125d0 
         else 
           val = 1d0
         end if 
