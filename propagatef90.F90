@@ -322,12 +322,12 @@ use simulation_parametersf90
         index =  -1 + n - (l*(1 + l - 2*nmax))/2
         ! We want the electron to start in the 1s state so we set psi0(0) = 1
         if (l>=labs .and. n>=nabs) then 
-          val = abs(dcos((dble(l - labs))*pi)/(2.d0*dble(lmax-labs))))**0.125d0*  &
-          & abs(dcos((dble(n - nabs)*pi)/(2.d0*dble(nmax-nabs))))**0.125d0 
+          val = dabs(dcos(((dble(l - labs))/(dble(lmax-labs)))*pi/2d0))**0.125d0*  &
+          & dabs(dcos(((dble(n - nabs)*pi)/(dble(nmax-nabs)))*pi/2d0))**0.125d0 
         else if (l>=labs) then
-          val = abs(dcos(((l - labs)*pi)/(2.d0*dble(lmax-labs))))**0.125d0
+          val = dabs(dcos(((dble(l - labs))/(dble(lmax-labs)))*pi/2d0))**0.125d0
         else if (n>=nabs) then 
-          val = abs(dcos(((n - nabs )*pi)/(2.d0*dble(nmax-nabs))))**0.125d0 
+          val = dabs(dcos(((dble(n - nabs ))/(dble(nmax-nabs)))*pi/2d0))**0.125d0 
         else 
           val = 1d0
         end if 
@@ -352,7 +352,7 @@ use simulation_parametersf90
 
   ! Tell the timestepper context what type of solver to use. I'll use 
   ! Crank-Nicolson, but this can be changed via a command line option
-  call TSSetType(ts,TSTHETA,ierr)
+  call TSSetType(ts,TSCN,ierr)
   CHKERRA(ierr)
   
   ! We will provide the Jacobian matrix only. Petsc will find the RHS. 
