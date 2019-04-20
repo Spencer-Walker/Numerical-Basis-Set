@@ -32,12 +32,12 @@ module simulation_parametersf90
 
 
   ! Laser perameters
-  PetscReal, parameter :: electric_field_strength =  0.053375290941998d0
+  PetscReal, parameter :: electric_field_strength =  0.041857936345846d0
   PetscReal, parameter :: omega_electric_field = 0.056953098011833d0
 
   ! Parameters for time propagation
-  PetscReal, parameter :: time_resolution = 0.01d0
-  PetscReal, parameter :: num_cycles = 5.d0
+  PetscReal, parameter :: time_resolution = 0.05d0
+  PetscReal, parameter :: num_cycles = 20.d0
   logical,   parameter :: custom_envalope_phase = .false.
 
   ! If above is set to true the below values are used.   
@@ -52,11 +52,11 @@ module simulation_parametersf90
   ! Grid detials
   real(dp),  parameter :: grid_space = 0.05d0  
   real(dp),  parameter :: R_min = 30.d0    
-  real(dp),  parameter :: R_max = 125.d0   
+  real(dp),  parameter :: R_max = 100.d0   
 
   ! Max energy level and angular momentum
-  integer,   parameter :: n_max = 175
-  integer,   parameter :: l_max = 120
+  integer,   parameter :: n_max = 300
+  integer,   parameter :: l_max = 60
   
   ! Tolerances needed for searching for energies 
   real(dp),  parameter :: binary_search_tol = 1d-4  
@@ -91,8 +91,8 @@ module simulation_parametersf90
   real(dp), parameter :: V_max = 0.5d0
   real(dp), parameter :: gobbler = 0.8d0
   logical,  parameter :: masking_function_present = .true.
-  integer,  parameter :: n_abs = 100
-  integer,  parameter :: l_abs = 80
+  integer,  parameter :: n_abs = 200
+  integer,  parameter :: l_abs = 50
 
   ! Some useful constants that show up often
   PetscScalar, parameter :: two = 2.d0
