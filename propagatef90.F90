@@ -94,11 +94,13 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
 
   told  = t
   
-  call VecPointwiseMult(tmp, psi, mask_vector, ierr)
-  CHKERRA(ierr)
-
-  call TSSetSolution(ts, tmp, ierr)
-  CHKERRA(ierr)
+  if (masking_function_present) then
+    call VecPointwiseMult(tmp, psi, mask_vector, ierr)
+    CHKERRA(ierr)
+ 
+    call TSSetSolution(ts, tmp, ierr)
+    CHKERRA(ierr)
+  end if 
 
   return
 endsubroutine RHSMatrixSchrodinger
