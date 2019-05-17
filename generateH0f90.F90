@@ -5,7 +5,8 @@ program main
 #include <petsc/finclude/petscdmda.h>
 use hdf5
 use simulation_parametersf90
-  use slepceps
+use slepceps
+use fgsl
   implicit none
 ! --------------------------------------------------------------------------
 ! Declarations

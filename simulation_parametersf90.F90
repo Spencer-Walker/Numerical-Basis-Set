@@ -8,7 +8,8 @@
 !> Spencer Walker
 !
 ! DESCRIPTION: 
-!>  This module will be shared between all simulation programs and contins all
+!>  This module will be shared between all simulation programs and
+!contins all
 !   shared parameters that the program will need.
 !
 ! REVISION HISTORY:
@@ -99,4 +100,4 @@ module simulation_parametersf90
   PetscScalar, parameter :: one = 1.d0
   PetscReal, parameter   :: zero = 0.d0
   real(dp), parameter :: pi = 3.141592653589793238462643383279502884197169
-  end module simulation_parametersf90
+end module simulation_parametersf90

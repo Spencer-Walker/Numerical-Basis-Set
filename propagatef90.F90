@@ -32,6 +32,7 @@ function E(t)
   ! This function computes the electric field at some given time 
   use simulation_parametersf90
   use time_propagation_module 
+  use fgsl
   implicit none 
   PetscReal       :: E0,wa,cep,T0,t,tcep
   PetscScalar     :: E
