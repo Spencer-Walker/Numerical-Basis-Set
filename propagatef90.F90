@@ -22,48 +22,9 @@ module time_propagation_module
   PetscReal :: told 
   Mat :: Z_scale,H0_scale,A
   PetscReal :: omega_vector_potential
+  PetscScalar, allocatable :: E(:)
+  PetscInt  :: masking_function_present
 end module time_propagation_module
-
-! --------------------------------------------------------------------------
-! Functions
-! --------------------------------------------------------------------------
-! --------------------------- Evaluate E(t) --------------------------------
-function E(t)
-  ! This function computes the electric field at some given time 
-  use simulation_parametersf90
-  use time_propagation_module 
-  implicit none 
-  PetscReal       :: E0,wa,cep,T0,t,tcep
-  PetscScalar     :: E
-
-  E0 = electric_field_strength
-  wa  = omega_vector_potential
-  T0 = num_cycles*2d0*pi/wa
-  if (custom_envalope_phase .eqv. .true.) then
-    cep = envelope_phase
-    tcep = time_envelope_phase_set 
-  else 
-    tcep = T0/2d0
-    cep  = tcep*wa
-  end if
-  
-  if (trim(envelope_function) .eq. 'sin2') then
-
-    E = E0*(-(dcos(cep + (t - tcep)*wa)*dsin((pi*t)/T0)**2d0) - &
-    & (2d0*pi*dcos((pi*t)/T0)*dsin((pi*t)/T0)*dsin(cep + (t - tcep)*wa))/(T0*wa))
-
-
-
-    !E = E0*137*dsin(cep + (t - tcep)*wa)*dsin((pi*t)/T0)**2d0/wa
-
-  else if ( trim(envelope_function) .eq. 'gaussian') then
-    E = -E0*dcos(wa*(t-tcep)+cep)*dexp(-dlog(2d0)*((2d0*(t-tcep))/T0)**2d0) -  &
-    & (8d0*E0*(t-tcep)*dlog(2d0)/T0**2d0)*dsin(wa*(t-tcep)+cep)*  &
-    & dexp(-dlog(2d0)*((2d0*(t-tcep))/T0)**2d0) 
-  end if
-
-  return
-endfunction E
 
 ! --------------------------------------------------------------------------
 ! Subroutines 
@@ -71,7 +32,6 @@ endfunction E
 ! ----------------------- RHSMatrixSchrodinger -----------------------------
 subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   use petscts
-  use simulation_parametersf90
   use time_propagation_module
   implicit none
   TS              :: ts
@@ -79,47 +39,43 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   Mat             :: J,BB
   PetscInt        :: user
   Vec             :: psi
-  PetscScalar     :: E,dotProduct
+  PetscScalar     :: dotProduct
   PetscErrorCode  :: ierr
   PetscInt        :: step
-  !PetscReal       :: norm
   
-  dt = t-told
-
-  if (mod(floor(t/dt),100) .eq. 0) then
-    print*, t
-  end if 
-
   call TSGetStepNumber(ts,step,ierr)
   CHKERRA(ierr)
+
+  dt = t-told
+  if (user .eq. 0) then
+    if (mod(floor(t/dt),100) .eq. 0) then
+      print*, t
+    end if 
+  end if 
+
+  call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
+
   call MatMult(A,psi,tmp,ierr)
   CHKERRA(ierr)
   call VecDot(psi,tmp,dotProduct,ierr)
   CHKERRA(ierr)
-
-  !print*,dotProduct
-
   call VecSetValue(dipoleA,step,dotProduct,INSERT_VALUES,ierr)
   CHKERRA(ierr)
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
-  call MatAXPY(J,+(E(t)),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
+  call MatAXPY(J,E(step),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
 
-  told  = t
-
-  !call VecNorm(psi,NORM_2,norm,ierr)
-  !CHKERRA(ierr)
-
-  !print*,norm
-
-  if (masking_function_present) then
+  if (masking_function_present .eq. 1) then
     call VecPointwiseMult(tmp, psi, mask_vector, ierr)
     CHKERRA(ierr)
- 
     call TSSetSolution(ts, tmp, ierr)
     CHKERRA(ierr)
   end if 
+
+
+  told  = t
 
   return
 endsubroutine RHSMatrixSchrodinger
@@ -129,36 +85,49 @@ endsubroutine RHSMatrixSchrodinger
 ! --------------------------------------------------------------------------
 program Main
 use time_propagation_module 
-use simulation_parametersf90
+use petscts
+use hdf5
 #include <petsc/finclude/petscts.h>
-  use petscts
   implicit none
 ! --------------------------------------------------------------------------
 ! Declarations
 ! --------------------------------------------------------------------------
-  KSP               :: ksp
-  PC                :: pc
-  SNES              :: snes
-  TS                :: ts
-  PetscErrorCode    :: ierr
-  Mat               :: J
-  PetscInt          :: i_start,i_end,failures
-  PetscInt          :: max_steps
-  Vec               :: psi
-  PetscViewer       :: viewer
-  PetscScalar       :: norm, scale, E, val
-  PetscInt          :: nmax,lmax,size,num_grid_points,nabs,labs,index
-  PetscInt          :: n,l,ninit,linit
-  PetscReal         :: E0,wa,cep,T0,numcycles,dt
-  PetscReal         :: h,r0,maxtime,we,mu
-  character(len=15) :: label,mask
-  external          :: RHSMatrixSchrodinger
-  PetscReal         :: start_time, end_time
-
+  KSP                 :: ksp
+  PC                  :: pc
+  SNES                :: snes
+  TS                  :: ts
+  PetscErrorCode      :: ierr
+  Mat                 :: J
+  PetscInt            :: i_start,i_end, i
+  PetscInt            :: max_steps, proc_id, num_proc
+  Vec                 :: psi
+  PetscViewer         :: viewer
+  PetscScalar         :: norm, val
+  PetscInt            :: nmax,lmax,size,nabs,labs,index
+  PetscInt            :: n,l, h5_err, mask_pow, num_states
+  integer(HSIZE_T)    :: dims(1)
+  PetscReal           :: dt
+  PetscReal           :: maxtime
+  character(len=15)   :: mask
+  character(len = 15) :: label ! File name without .h5 extension
+  external            :: RHSMatrixSchrodinger
+  PetscReal           :: start_time, end_time
+  integer(HID_T)      :: param_file_id
+  integer(HID_T)      :: eps_group_id, memtype, eps_dat_id
+  integer(HID_T)      :: operators_group_id, operators_dat_id
+  integer(HID_T)      :: start_group_id, start_dat_id
+  integer(HID_T)      :: laser_group_id, laser_dat_id
+  integer(HID_T)      :: tdse_group_id, tdse_dat_id
+  character(len = 50) :: tmp_character
+  MatType             :: mat_type
+  integer(SIZE_T), parameter :: sdim = 50 
+  PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
+  PetscReal,  allocatable :: EE(:)
+  PetscInt,   allocatable  :: init_n(:), init_l(:)
+  PetscReal,  allocatable :: init_amp(:), init_phase(:)
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
-
   call CPU_TIME(start_time)
 
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
@@ -167,68 +136,151 @@ use simulation_parametersf90
     stop
   endif
 
-  ninit = n_init
-  linit = l_init
-  nmax = n_max
-  lmax = l_max
-  mask = trim(mask_type)
+  print*,"h5open_f"
+  ! Opens hdf5 to read in the label.h5 file 
+  call h5open_f( h5_err)
+  if ( h5_err /= 0 ) then
+    print*,'h5open_f failed'
+    stop
+  end if
 
-  if (masking_function_present) then
-    nabs = n_abs
-    labs = l_abs
-  end if 
+  call MPI_Comm_rank(MPI_COMM_WORLD,proc_id,ierr)
+  CHKERRA(ierr)
+  call MPI_Comm_size(MPI_COMM_WORLD,num_proc,ierr)
+  CHKERRA(ierr)
 
-  failures    = -1
-  label = hdf5_file_label
+  dims(1) = 1
+  call h5fopen_f( trim("parameters.h5"), H5F_ACC_RDONLY_F, param_file_id, h5_err)
+  call h5gopen_f(param_file_id, "TDSE", tdse_group_id, h5_err)
+
+  call h5dopen_f(tdse_group_id, "l_max", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, lmax, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
+  print*, "lmax",lmax
+
+  call h5dopen_f(tdse_group_id, "n_max", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, nmax, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
+  print*, "nmax",nmax
+
+  call H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
+  call H5Tset_size_f(memtype, sdim, h5_err)
+  
+  call h5dopen_f(tdse_group_id, "mask_type", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, memtype, mask, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+  
+  print*, "mask_type", mask
+
+  call h5dopen_f(tdse_group_id, "mask_present", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, masking_function_present, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+  
+  print*, "mask_present", masking_function_present
+
+  call h5dopen_f(tdse_group_id, "mask_n_abs", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, nabs, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
+  print*, "mask_n_abs", nabs
+
+  call h5dopen_f(tdse_group_id, "mask_l_abs", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, labs, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
+  print*, "mask_l_abs", labs
+
+  call h5dopen_f(tdse_group_id, "mask_pow", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_DOUBLE, mask_pow, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
+  print*, "mask_pow", mask_pow
+
+  call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
+
+  call h5dopen_f(eps_group_id, "label", eps_dat_id, h5_err)
+  call h5dread_f(eps_dat_id, memtype, label, dims, h5_err)
+  call h5dclose_f( eps_dat_id, h5_err)
+
+  print*, "label", label
+
+  call h5gopen_f(param_file_id, "start_state", start_group_id, h5_err)
+  dims(1) = 1
+  call h5dopen_f(start_group_id, "num_states", start_dat_id, h5_err)
+  call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, num_states, dims, h5_err)
+  call h5dclose_f(start_dat_id, h5_err)
+  
+  print*, "num_states"
+
+  allocate(init_n(num_states))
+  allocate(init_l(num_states))
+  allocate(init_amp(num_states))
+  allocate(init_phase(num_states))
+  dims(1) = num_states
+  call h5dopen_f(start_group_id, "n_index", start_dat_id, h5_err)
+  call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, init_n, dims, h5_err)
+  call h5dclose_f(start_dat_id, h5_err)
+  
+  print*, "init_n", init_n
+
+  call h5dopen_f(start_group_id, "l_index", start_dat_id, h5_err)
+  call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, init_l, dims, h5_err)
+  call h5dclose_f(start_dat_id, h5_err)
+
+  print*, "init_l", init_l
+
+  call h5dopen_f(start_group_id, "amplitude", start_dat_id, h5_err)
+  call h5dread_f(start_dat_id, H5T_NATIVE_DOUBLE, init_amp, dims, h5_err)
+  call h5dclose_f(start_dat_id, h5_err)
+
+  print*, "init_amp", init_amp
+
+  call h5dopen_f(start_group_id, "phase", start_dat_id, h5_err)
+  call h5dread_f(start_dat_id, H5T_NATIVE_DOUBLE, init_phase, dims, h5_err)
+  call h5dclose_f(start_dat_id, h5_err)
+  
+  print*, "init_phase", init_phase
+
   ! If nmax <= lmax+1 we chose the normal basis size but if it is large 
   ! the basis is truncated in l
   if(nmax .le. lmax+1) then
-     size = (nmax - 1)*nmax/2 + lmax + 1
+      size = (nmax - 1)*nmax/2 + lmax + 1
   else
-     size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
+      size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
           lmax + 1
   endif
-  print*,size
-  h               = r0/num_grid_points 
+  print*, "size",size
 
   ! These are the default values in atomic units the user is free to change 
   ! them as an extra argument when running the program 
-  dt   = time_resolution
-  cep  = envelope_phase
-  numcycles  = num_cycles
-  E0 = electric_field_strength
-  we = omega_electric_field
+  dims(1) = 1
+  call h5dopen_f(tdse_group_id, "delta_t", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_DOUBLE, dt, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
 
-  if ( trim(envelope_function) .eq. 'sin2' ) then
-    mu = 4d0*dasin(dexp(-0.25d0))**2d0
-  else if( trim(envelope_function) .eq. 'gaussian') then
-    mu = 8d0*dlog(2d0)/pi**2d0
-    print*,'only sin2 is supported'
-    stop
-  else 
-    print*,'only sin2 is are supported'
-    stop
-  end if 
-
-  omega_vector_potential = 2d0*we/(1d0 + dsqrt(1d0 + mu/num_cycles**2d0))
-  wa = omega_vector_potential
-
-  T0 = num_cycles*2d0*pi/wa
-
-  maxtime = T0
-
-  print*, 'E0 =',E0
-  print*, 'we =',we
-  print*, 'wa =',wa
-  print*, 'T0 =',T0
   print*, 'dt =',dt 
 
-  scale =  dcmplx(0.d0,-1.d0)
+  call h5gopen_f(param_file_id, "operators", operators_group_id, h5_err)
+
+  call h5dopen_f(operators_group_id, "mat_type", operators_dat_id, h5_err)
+  call h5dread_f(operators_dat_id, memtype, tmp_character,dims, h5_err)
+  call h5dclose_f( eps_dat_id, h5_err)
+  if (trim(tmp_character) .eq. "MATSBAIJ") then
+    mat_type = MATSBAIJ
+  else if (trim(tmp_character) .eq. "MATAIJ") then
+    mat_type = MATAIJ
+  else 
+    print*, "mat_type not supported defaulting to MATAIJ"
+    mat_type = MATAIJ   
+  end if 
+
+  print*, "mat_type", mat_type
 
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
 ! --------------------------------------------------------------------------
-
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
@@ -236,7 +288,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call MatSetSizes(Z_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetType(Z_scale,eps_mat_type,ierr)
+  call MatSetType(Z_scale,mat_type,ierr)
   CHKERRA(ierr)
   call MatSetFromOptions(Z_scale,ierr)
   CHKERRA(ierr)
@@ -246,7 +298,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call MatLoad(Z_scale,viewer,ierr)
   CHKERRA(ierr)
-  call MatScale(Z_scale,scale,ierr)
+  call MatScale(Z_scale,(0.d0,-1.d0),ierr)
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
@@ -254,7 +306,6 @@ use simulation_parametersf90
 ! --------------------------------------------------------------------------
 ! Create dipole acceleration matrix
 ! --------------------------------------------------------------------------
-
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
@@ -262,7 +313,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetType(A,eps_mat_type,ierr)
+  call MatSetType(A,mat_type,ierr)
   CHKERRA(ierr)
   call MatSetFromOptions(A,ierr)
   CHKERRA(ierr)
@@ -278,7 +329,6 @@ use simulation_parametersf90
 ! --------------------------------------------------------------------------
 ! Create the H0_scale matrix
 ! --------------------------------------------------------------------------
-
   call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
   & trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr)
   CHKERRA(ierr)
@@ -286,7 +336,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call MatSetSizes(H0_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetType(H0_scale,eps_mat_type,ierr)
+  call MatSetType(H0_scale,mat_type,ierr)
   CHKERRA(ierr)
   call MatSetFromOptions(H0_scale,ierr)
   CHKERRA(ierr)
@@ -296,7 +346,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call MatLoad(H0_scale,viewer,ierr)
   CHKERRA(ierr)
-  call MatScale(H0_scale,scale,ierr)
+  call MatScale(H0_scale,(0.d0,-1.d0),ierr)
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
@@ -308,7 +358,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call MatSetSizes(J,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetType(J,eps_mat_type,ierr)
+  call MatSetType(J,mat_type,ierr)
   CHKERRA(ierr)
   call MatSetFromOptions(J,ierr)
   CHKERRA(ierr)
@@ -317,8 +367,8 @@ use simulation_parametersf90
   call MatCopy(H0_scale,J,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   told = 0.d0
-  call MatAXPY(J,+E(told),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
-  CHKERRA(ierr)
+!  call MatAXPY(J,(0.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+!  CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
 ! Propagate
@@ -327,9 +377,13 @@ use simulation_parametersf90
   call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,size,psi,ierr)
   CHKERRA(ierr)
   ! We want the electron to start in the 1s state so we set psi0(0) = 1
-  index =  -1 + ninit - (linit*(1 + linit - 2*nmax))/2
-  call VecSetValue(psi,index,(1d0,0d0),INSERT_VALUES,ierr)
-  CHKERRA(ierr)
+  if (proc_id .eq. 0) then
+    do i = 1, num_states 
+      index =  -1 + init_n(i) - (init_l(i)*(1 + init_l(i) - 2*nmax))/2
+      call VecSetValue(psi,index,init_amp(i)*zexp(dcmplx(0d0,init_phase(i))),ADD_VALUES,ierr)
+      CHKERRA(ierr)
+    end do 
+  end if
   call VecAssemblyBegin(psi,ierr)
   CHKERRA(ierr)
   call VecAssemblyEnd(psi,ierr)
@@ -340,7 +394,7 @@ use simulation_parametersf90
   CHKERRA(ierr)
 
   ! Create the masking vector
-  if (masking_function_present) then
+  if (masking_function_present .eq. 1) then
     do l = 0,lmax
       do n=l+1,nmax
         index =  -1 + n - (l*(1 + l - 2*nmax))/2
@@ -365,42 +419,60 @@ use simulation_parametersf90
         CHKERRA(ierr)
       end do
     end do
-    
     call VecAssemblyBegin(mask_vector,ierr) 
+    CHKERRA(ierr)
     call VecAssemblyEnd(mask_vector,ierr)
+    CHKERRA(ierr)
   end if 
-  
+
   ! Create timestepper context where to compute solutions
   call TSCreate(PETSC_COMM_WORLD,ts,ierr)
   CHKERRA(ierr)
   call TSSetProblemType(ts,TS_LINEAR,ierr)
   CHKERRA(ierr)
-
   ! Tell the timestepper context where to compute solutions
   call TSSetSolution(ts,psi,ierr)
   CHKERRA(ierr)
-
   ! Tell the timestepper context what type of solver to use. I'll use 
   ! Crank-Nicolson, but this can be changed via a command line option
   call TSSetType(ts,TSTHETA,ierr)
   CHKERRA(ierr)
-  
   ! We will provide the Jacobian matrix only. Petsc will find the RHS. 
   call TSSetRHSFunction(ts,PETSC_NULL_VEC,TSComputeRHSFunctionLinear, &
-  & 0, ierr)
+  & proc_id, ierr)
   CHKERRA(ierr)
-
   ! Now we will provide the Jacobian matrix
   call TSSetRHSJacobian(ts,J,J,RHSMatrixSchrodinger,0,ierr)
   CHKERRA(ierr)
 
+  print*,"E"
+  call h5gopen_f(param_file_id, "laser", laser_group_id, h5_err)
+  
+  call h5dopen_f(laser_group_id, "E_length", laser_dat_id, h5_err)
+  call h5dread_f(laser_dat_id, H5T_NATIVE_INTEGER, max_steps, dims, h5_err)
+  call h5dclose_f( laser_dat_id, h5_err)
+  
+  allocate(E(0:max_steps-1))
+  allocate(EE(0:max_steps-1))
+  
+  dims(1) = max_steps
+  print*, "dims",dims(1)
+  call h5dopen_f(laser_group_id, "E", laser_dat_id, h5_err)
+  call h5dread_f(laser_dat_id, H5T_NATIVE_DOUBLE, EE, dims, h5_err)
+  call h5dclose_f( laser_dat_id, h5_err)
+
+  E = dcmplx(EE,0d0)
+
   ! I'll set the initial time to be t = 0
   call TSSetTime(ts,0d0,ierr)
   CHKERRA(ierr)
-
   ! Here we set the timestep 
   call TSSetTimeStep(ts,dt,ierr)
   CHKERRA(ierr)
+
+  maxtime = max_steps*dt
+
+  print*, "maxtime", maxtime
 
   ! Here we set the maximum time maxtime
   call TSSetMaxTime(ts,maxtime,ierr)
@@ -410,7 +482,6 @@ use simulation_parametersf90
   ! to get the value at this time
   call TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP,ierr)
   CHKERRA(ierr)
-
 
   ! Here we set the KSP solver in SNES in TS
   call TSGetSNES(ts,snes,ierr)
@@ -434,9 +505,6 @@ use simulation_parametersf90
   call TSSetSNES(ts,snes,ierr)
   CHKERRA(ierr)
 
-  
-  max_steps = ceiling(T0/dt) 
-
   call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,max_steps,dipoleA,ierr)
   CHKERRA(ierr)
   call VecSet(dipoleA,(0d0,0d0),ierr)
@@ -456,20 +524,17 @@ use simulation_parametersf90
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
-
   call VecAssemblyBegin(dipoleA,ierr)
+  CHKERRA(ierr)
   call VecAssemblyEnd(dipoleA,ierr)
-
+  CHKERRA(ierr)
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAcceleration.output',&
   & viewer,ierr)
   CHKERRA(ierr)
-
   call VecView(dipoleA,viewer,ierr)
   CHKERRA(ierr)
-
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
-
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
   & viewer,ierr)
   CHKERRA(ierr)
@@ -478,8 +543,6 @@ use simulation_parametersf90
   call VecSum(psi,norm,ierr)
   CHKERRA(ierr)
   print*,'Norm is',norm
-
-
 
 ! --------------------------------------------------------------------------
 ! Clear memory
@@ -500,10 +563,12 @@ use simulation_parametersf90
   call VecDestroy(dipoleA,ierr)
   CHKERRA(ierr)
   call PetscFinalize(ierr)
-
+  CHKERRA(ierr)
   call CPU_TIME(end_time)
-    
-  print*, 'time   :', end_time-start_time
-
-
+  
+  if(proc_id .eq. 0) then
+    print 20, 'time   :', end_time-start_time
+    20 format(A8,ES9.2)
+  end if 
+  deallocate(E,EE,init_n,init_l,init_amp,init_phase)
 end program Main

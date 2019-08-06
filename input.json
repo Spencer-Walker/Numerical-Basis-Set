@@ -1,0 +1,108 @@
+{
+  "mpi":
+  {
+    "np": 16,
+    "assign_host": 0,
+    "host": "photon9,photon10"
+  },
+  "TDSE": 
+  {
+    "propagate": 1,
+    "delta_t": 0.05,
+    "l_max": 50,
+    "m_max": 0,
+    "n_max": 100,
+    "mat_type": "MATSBAIJ",    
+    "mask_present": 0,
+    "mask_type": "cosine",
+    "mask_pow": 1.0,
+    "mask_n_abs": 1000,
+    "mask_l_abs": 1000
+  },
+  "operators":
+  {
+    "compute": 1,
+    "local": 1,
+    "location": "Not aplicable since local = 1",
+    "mat_type": "MATSBAIJ"
+  },
+  "laser": 
+  {
+    "frequency_shift": 1,
+    "pulse": 
+    [
+      {
+        "cep": 0.0,
+        "cycles": 2.0,
+        "wavelength": 800.0,
+        "gaussian_length": 5.0,
+        "intensity": 1.0e14,
+        "pulse_shape": "sin2",
+        "custom_envalope_phase" : 0,
+        "relative_delay": 0.0
+			}
+    ]
+  },
+  "start_state": 
+  {
+    "num_states": 1,
+    "amplitude": 
+    [
+      1.0
+    ],
+    "m_index": 
+    [
+      0
+    ],
+    "l_index": 
+    [
+      0
+    ],
+    "n_index": 
+    [
+      1
+    ],
+    "phase": 
+    [
+      0.0
+    ]
+  },
+
+  "EPS": 
+  {
+    "compute": 1,
+    "label": "H",
+    "l_max": 50,
+    "n_max": 100,
+    "m_max": 0,
+    "delta_x": 0.1,
+    "R_max": 100.0,
+    "abs_tol": 1.0e-10,
+    "max_its": 100000,
+    "cap_present": 1,
+    "cap_eta": 0.5,
+    "gobbler": 0.9,
+    "EPSSetWhichEigenpairs": "EPS_SMALLEST_REAL",
+    "EPSSetType": "EPSKRYLOVSCHUR",
+    "EPSSetProblemType": "EPS_NHEP",
+    "ncv": -1,
+    "mpd": -1,
+    "EPSSetTwoSided": 0,
+    "EPSSetBalance": "EPS_BALANCE_NONE",
+    "EPSSetTarget": [-0.5,0.0],
+    "nuclei": 
+    {
+      "a": 
+      [
+        0.0
+      ],
+      "b": 
+      [
+        0.0
+      ],
+      "c":  0.0,
+      "c0": 1.0,
+      "Zc": 0.0
+    }
+  }
+}

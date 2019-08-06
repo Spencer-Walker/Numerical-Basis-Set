@@ -24,7 +24,7 @@ data = np.array(dipole_acceleration)
 data = data
 #data = data * np.blackman(data.shape[0])
 padd2 = 2**np.ceil(np.log2(data.shape[0] * 4))
-paddT = 1110.0249999995383* padd2 / data.shape[0]
+paddT = 255.02500000002374*padd2 / data.shape[0]
 dH = 2 * np.pi / paddT / energy
 if np.max(data) > 1e-19:
   data = np.absolute(
@@ -43,7 +43,7 @@ plt.ylabel("HHG Spectrum (a.u.)")
 plt.title("HHG Spectrum")
 plt.legend()
 x_min = 0
-x_max = 30
+x_max = 55
 plt.xticks(np.arange(x_min + 1, x_max + 1, 2.0))
 plt.xlim([x_min, x_max])
 plt.ylim([1e-10, 1])
