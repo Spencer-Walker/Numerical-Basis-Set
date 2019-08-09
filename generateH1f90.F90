@@ -34,6 +34,7 @@ implicit none
   integer(SIZE_T), parameter :: sdim = 300 
   integer(HID_T)      :: file_id, param_file_id
   integer(HID_T)      :: eps_group_id, memtype, eps_dat_id
+  integer(HID_T)      :: install_dat_id
   integer(HID_T)      :: operators_group_id, operators_dat_id
   integer(HID_T)      :: tdse_group_id, tdse_dat_id
   character(len = 15) :: label ! File name without .h5 extension
@@ -42,6 +43,7 @@ implicit none
   character(len = 6)  :: fmt ! format descriptor
   character(len = 30) :: file_name
   character(len = 300):: tmp_character, basis_directory, working_directory
+  character(len = 300):: install_directory
   MatType :: mat_type
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
   PetscInt,   allocatable  :: block_n(:), block_l(:)
@@ -74,6 +76,10 @@ implicit none
   dims(1) = 1
   call H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
   call H5Tset_size_f(memtype, sdim, h5_err)
+
+  call h5dopen_f(param_file_id, "install_directory", install_dat_id, h5_err)
+  call h5dread_f(install_dat_id, memtype, install_directory, dims, h5_err)
+  call h5dclose_f(install_dat_id, h5_err)
 
   call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
 
@@ -281,13 +287,14 @@ implicit none
 ! --------------------------------------------------------------------------
 ! Load in Clebsch Gordan Coefficients from .bin File
 ! --------------------------------------------------------------------------
+  status = chdir(trim(install_directory))
   open(5, file='clebsch_gordan.bin', form='unformatted',access='stream')
   
   do itter = 1,tdse_lmax
       read(5, pos=8*itter - 7) clebsch_gordan(itter)
   enddo
   close(5)
-
+  status = chdir(trim(basis_directory))
   ! Itterate over angular momentum to calculate half the matrix elements
   L_LP_LOOP: do l = l_i_start,l_i_end
     ! For linearly polarized pulses the only non-zero matrix elements are 

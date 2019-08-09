@@ -182,7 +182,6 @@ use ifport
   allocate(col(tdse_nmax))
   allocate(val(tdse_nmax))
 
-
   l_i_start = -1
   l_i_end = -1
   do l = 0,tdse_lmax
@@ -196,7 +195,6 @@ use ifport
       end if 
     end do
   end do
-
 
   ! Itterate over angular momentum to calculate the matrix elements
   do l = l_i_start,l_i_end  
