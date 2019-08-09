@@ -41,7 +41,7 @@ implicit none
   character(len = 12) :: psi_name
   character(len = 6)  :: fmt ! format descriptor
   character(len = 30) :: file_name
-  character(len = 300) :: tmp_character, basis_directory, working_directory
+  character(len = 300):: tmp_character, basis_directory, working_directory
   MatType :: mat_type
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
   PetscInt,   allocatable  :: block_n(:), block_l(:)
@@ -70,11 +70,12 @@ implicit none
   comm  = MPI_COMM_WORLD
 
   call h5fopen_f( trim("parameters.h5"), H5F_ACC_RDONLY_F, param_file_id, h5_err)
-  call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
 
   dims(1) = 1
   call H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
   call H5Tset_size_f(memtype, sdim, h5_err)
+
+  call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
 
   call h5dopen_f(eps_group_id, "label", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, memtype, label, dims, h5_err)
@@ -280,7 +281,6 @@ implicit none
 ! --------------------------------------------------------------------------
 ! Load in Clebsch Gordan Coefficients from .bin File
 ! --------------------------------------------------------------------------
-
   open(5, file='clebsch_gordan.bin', form='unformatted',access='stream')
   
   do itter = 1,tdse_lmax

@@ -75,7 +75,7 @@
   {
     "local": 0,
     "location": "/home/becker/spwa4419/Documents/Numerical-Basis-Set",
-    "compute": 0,
+    "compute": 1,
     "label": "H",
     "l_max": 50,
     "n_max": 100,

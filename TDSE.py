@@ -3,6 +3,8 @@ import json
 import h5py
 import numpy as np
 
+path = os.path.dirname(os.path.realpath(__file__))
+
 def potential(c0,zc,a,b,c,r,cap_eta,cap_present,gobbler):
   V =  np.zeros((2,len(r)))
   V[0,:] += -c0/r
@@ -212,6 +214,9 @@ dset = params["laser"].create_dataset("E",(num_steps,),dtype = "f8")
 dset[:] = E[:]
 dset = params["laser"].create_dataset("E_length",(1,),dtype = "i4")
 dset[0] = num_steps
+
+dset = params.create_dataset("install_directory",(1,),dtype = "S"+str(len(path)))
+dset[0] = np.string_(path)
 params.close()
 
 
@@ -220,14 +225,17 @@ if data["EPS"]["compute"] == 1 :
   if data["mpi"]["assign_host"] == 1:
     print("basisf90")
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
-      " --host " + str(data["mpi"]["host"]) + " ./basisf90")
+      " --host " + str(data["mpi"]["host"]) + " "+path+"/basisf90")
   else:
     print("basisf90")
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
-      " ./basisf90")
+      " "+path+"/basisf90")
 
 params = h5py.File('parameters.h5','r+')
-atom = h5py.File(str(data["EPS"]["label"])+".h5","r")
+if data["EPS"]["local"] == 0:
+  atom = h5py.File(str(data["EPS"]["location"]) +"/" + str(data["EPS"]["label"])+".h5","r")
+else:
+  atom = h5py.File(str(data["EPS"]["label"])+".h5","r")
 block_n = np.array([])
 block_l = np.array([])
 if data["block_state"]["sfa"] == 1:
@@ -260,27 +268,27 @@ if data["operators"]["compute"] == 1:
     print("generateH0f90")
     os.system("mpirun -np " + str(min(data["mpi"]["np"],data["TDSE"]["l_max"])) + \
       " --host " + str(data["mpi"]["host"]) + \
-        " ./generateH0f90")
+        " "+path+"/generateH0f90")
     if data["TDSE"]["l_max"] > 0:
       print("generateH1f90")
       os.system("mpirun -np " + str(min(data["mpi"]["np"],data["TDSE"]["l_max"]))+ \
         " --host " + str(data["mpi"]["host"]) + \
-          " ./generateH1f90")
+          " "+path+"/generateH1f90")
       print("generateDipoleAccelerationf90")
       os.system("mpirun -np " + str(min(data["mpi"]["np"],data["TDSE"]["l_max"])) + \
         " --host " + str(data["mpi"]["host"]) + \
-          " ./generateDipoleAccelerationf90")
+          " "+path+"/generateDipoleAccelerationf90")
   else:
     print("generateH0f90")
     os.system("mpirun -np " + str(min(data["mpi"]["np"],data["TDSE"]["l_max"])) + \
-      " ./generateH0f90")
+      " "+path+"/generateH0f90")
     if data["TDSE"]["l_max"] > 0:
       print("generateH1f90")
       os.system("mpirun -np " + str(min(data["mpi"]["np"],data["TDSE"]["l_max"])) + \
-        " ./generateH1f90")
+        " "+path+"/generateH1f90")
       print("generateDipoleAccelerationf90")
       os.system("mpirun -np " + str(min(data["mpi"]["np"],data["TDSE"]["l_max"])) + \
-        " ./generateDipoleAccelerationf90")
+        " "+path+"/generateDipoleAccelerationf90")
 
 # Propagate 
 if data["TDSE"]["propagate"] == 1:
@@ -288,8 +296,8 @@ if data["TDSE"]["propagate"] == 1:
   if data["mpi"]["assign_host"] == 1:
     print("propagatef90")
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
-      " --host " + str(data["mpi"]["host"]) + " ./propagatef90")
+      " --host " + str(data["mpi"]["host"]) + " "+path+"/propagatef90")
   else:
     print("propagatef90")
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
-      " ./propagatef90")
+      " "+path+"/propagatef90")

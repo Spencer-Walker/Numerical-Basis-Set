@@ -457,6 +457,7 @@ use mpi
     ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     !     Store solution
     ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
     allocate(u_right(num_points,nev))
     allocate(E_right(nev))
     allocate(ix(num_points))
@@ -500,6 +501,7 @@ use mpi
       end if
     end do 
 
+#if 0
     if(eps_two_sided .eqv. PETSC_TRUE ) then
       S = matmul(transpose(u_left),u_right)
 
@@ -555,7 +557,8 @@ use mpi
     else
       u_left = u_right
     end if 
-
+#endif 
+    u_left = u_right
     ! There will be nmax-l eigenstates for each l 
     ener_dims(1) = nmax-l
     ener_dims(2) = 2
@@ -582,11 +585,12 @@ use mpi
     ! Writes u_left to Psi_l_l#l
     call h5dwrite_f( psi_dset_left(l), h5_kind, uu_left, psi_dims, h5_err)
 
+    
+    deallocate(u_right)
     deallocate(uu_right)
     deallocate(EE_right)
     deallocate(ix)
     deallocate(u_left)
-    deallocate(u_right)
     deallocate(E_right)
     deallocate(uu_left)
     deallocate(S)
