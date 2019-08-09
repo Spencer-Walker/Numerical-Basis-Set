@@ -226,6 +226,33 @@ if data["EPS"]["compute"] == 1 :
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
       " ./basisf90")
 
+params = h5py.File('parameters.h5','r+')
+atom = h5py.File(str(data["EPS"]["label"])+".h5","r")
+block_n = np.array([])
+block_l = np.array([])
+if data["block_state"]["sfa"] == 1:
+  for l in range(data["TDSE"]["l_max"]+1):
+    for n in range(l+1,data["TDSE"]["n_max"]+1):
+      if n == 1 and l == 0:
+        continue
+      if atom["Energy_l"+str(l)][0][n-l-1] < 0.0 and \
+        np.abs(atom["Energy_l"+str(l)][1][n-l-1]) < np.log(1.0/data["block_state"]["sfa_tol"])/max_time:
+        block_n = np.append(block_n,n)
+        block_l = np.append(block_l,l)
+  del params["block_state"]["num_block"] 
+  dset = params["block_state"].create_dataset("num_block",(1,),dtype = "i4")
+  dset[0] = len(block_n)
+  del params["block_state"]["n_index"]
+  dset = params["block_state"].create_dataset("n_index",(len(block_n),),dtype = "i4")
+  dset[:] = block_n[:]
+  del params["block_state"]["l_index"]
+  dset = params["block_state"].create_dataset("l_index",(len(block_n),),dtype = "i4")
+  dset[:] = block_l[:]
+ 
+
+params.close()
+atom.close()
+
 # Compute operators  
 if data["operators"]["compute"] == 1:
   # If manually assigning host (done when running on multiple nodes)

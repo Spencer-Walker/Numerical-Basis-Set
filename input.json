@@ -11,8 +11,7 @@
     "delta_t": 0.05,
     "l_max": 50,
     "m_max": 0,
-    "n_max": 100,
-    "mat_type": "MATSBAIJ",    
+    "n_max": 100,   
     "mask_present": 0,
     "mask_type": "cosine",
     "mask_pow": 1.0,
@@ -22,8 +21,8 @@
   "operators":
   {
     "compute": 1,
-    "local": 1,
-    "location": "Not aplicable since local = 1",
+    "local": 0,
+    "location": "/home/becker/spwa4419/Documents/Numerical-Basis-Set",
     "mat_type": "MATSBAIJ"
   },
   "laser": 
@@ -33,14 +32,14 @@
     [
       {
         "cep": 0.0,
-        "cycles": 2.0,
+        "cycles": 5.0,
         "wavelength": 800.0,
         "gaussian_length": 5.0,
         "intensity": 1.0e14,
         "pulse_shape": "sin2",
         "custom_envalope_phase" : 0,
         "relative_delay": 0.0
-			}
+      }
     ]
   },
   "start_state": 
@@ -49,10 +48,6 @@
     "amplitude": 
     [
       1.0
-    ],
-    "m_index": 
-    [
-      0
     ],
     "l_index": 
     [
@@ -67,10 +62,20 @@
       0.0
     ]
   },
-
+  "block_state": {
+    "num_block": 0,
+    "sfa": 0,
+    "sfa_tol": 0.000000000000000000000000000000000000000000000000000000001,
+    "l_index": [
+    ],
+    "n_index": [
+    ]
+  },
   "EPS": 
   {
-    "compute": 1,
+    "local": 0,
+    "location": "/home/becker/spwa4419/Documents/Numerical-Basis-Set",
+    "compute": 0,
     "label": "H",
     "l_max": 50,
     "n_max": 100,

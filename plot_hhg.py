@@ -22,9 +22,9 @@ fig = plt.figure(figsize=(24, 18), dpi=80)
 energy =  0.056953098011833
 data = np.array(dipole_acceleration)
 data = data
-#data = data * np.blackman(data.shape[0])
+data = data * np.blackman(data.shape[0])
 padd2 = 2**np.ceil(np.log2(data.shape[0] * 4))
-paddT = 255.02500000002374*padd2 / data.shape[0]
+paddT = 568.7*padd2 / data.shape[0]
 dH = 2 * np.pi / paddT / energy
 if np.max(data) > 1e-19:
   data = np.absolute(

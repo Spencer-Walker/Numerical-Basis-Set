@@ -20,8 +20,8 @@ use mpi
   character(len = 24)   :: file_name 
   character(len = 3)    :: strl ! file number
   character(len = 6)    :: fmt  ! format descriptor 
-  integer(SIZE_T), parameter :: sdim      = 50 
-  character(len = 50)   :: tmp_character
+  integer(SIZE_T), parameter :: sdim      = 300 
+  character(len = 300)   :: tmp_character
   integer(HSIZE_T)  :: dims(1), dims2(2)
   Mat            :: H
   Vec            :: Vi
@@ -29,7 +29,7 @@ use mpi
   EPSType        :: tname
   PetscBool      :: cap_present
   PetscInt       :: num_points, i, j, Istart, Iend, l_start, l_stop, l_stride
-  PetscInt       :: nev, Iabs, ncv, mpd, ncon, maxits, lmax, l
+  PetscInt       :: nev, ncv, mpd, ncon, maxits, lmax, l
   PetscInt       :: row(1), col(3), tmp_int
   PetscInt, allocatable :: ix(:), IPIV(:)
   PetscReal :: cap_eta
@@ -54,11 +54,10 @@ use mpi
   ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   call CPU_TIME(start_time)
 
-  10 format(A2,I4)
-
   call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
-    print*,'SlepcInitialize failed'
+    call PetscPrintf(MPI_COMM_WORLD, "SlepcInitialize failed\n", ierr)
+    CHKERRA(ierr)
     stop
   end if
   call MPI_Comm_rank(PETSC_COMM_WORLD,proc_id,ierr);CHKERRA(ierr)
@@ -66,10 +65,12 @@ use mpi
 
   ! Initialize hdf5 
   call h5open_f( h5_err)
-  if ( h5_err /= 0 ) then
-    print*,'h5open_f failed'
+  if ( h5_err .ne. 0 ) then
+    call PetscPrintf(MPI_COMM_WORLD, 'h5open_f failed\n', ierr)
+    CHKERRA(ierr)
     stop
   end if
+
   call h5fopen_f( trim("parameters.h5"), H5F_ACC_RDONLY_F, param_file_id, h5_err)
   call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
   
@@ -86,7 +87,8 @@ use mpi
   else if (trim(tmp_character) .eq. "EPS_BALANCE_NONE") then
     eps_balance = EPS_BALANCE_NONE
   else 
-    print*, "EPSBalance not supported defaulting to EPS_BALANCE_NONE"
+    call PetscPrintf(MPI_COMM_WORLD, "EPSBalance not supported defaulting to EPS_BALANCE_NONE\n", ierr)
+    CHKERRA(ierr)
     eps_balance = EPS_BALANCE_NONE
   end if 
   
@@ -165,7 +167,8 @@ use mpi
   else if (trim(tmp_character) .eq. "EPS_GNHEP") then
     eps_problem = EPS_GNHEP
   else 
-    print*, "EPSProblemType not supported defaulting to EPS_NHEP"
+    call PetscPrintf(MPI_COMM_WORLD, "EPSProblemType not supported defaulting to EPS_NHEP\n", ierr)
+    CHKERRA(ierr)
     eps_problem = EPS_NHEP
   end if 
   
@@ -225,7 +228,8 @@ use mpi
   else if (trim(tmp_character) .eq. "EPSFEAST") then 
     eps_type = EPSFEAST
   else 
-    print*, "EPSType not supported defaulting to EPSKRYLOVSCHUR"
+    call PetscPrintf(MPI_COMM_WORLD, "EPSType not supported defaulting to EPSKRYLOVSCHUR\n", ierr)
+    CHKERRA(ierr)
     eps_type = EPSKRYLOVSCHUR
   end if 
 
@@ -253,15 +257,19 @@ use mpi
   else if (trim(tmp_character) .eq. "EPS_ALL") then 
     eps_which = EPS_ALL
   else
-    print*, "EPSWhich not supported defaulting to EPS_SMALLEST_REAL"
+    call PetscPrintf(MPI_COMM_WORLD, "EPSWhich not supported defaulting to EPS_SMALLEST_REAL\n", ierr)
+    CHKERRA(ierr)
     eps_which = EPS_SMALLEST_REAL
   end if 
 
   ! Add the .h5 extension to the file label
   file_name = trim(label)//'.h5'
-  allocate(psi_space_right(0:lmax),psi_dset_right(0:lmax))
-  allocate(ener_space(0:lmax),ener_dset(0:lmax))
-  allocate(psi_space_left(0:lmax),psi_dset_left(0:lmax))
+  allocate(psi_space_right(0:lmax))
+  allocate(psi_dset_right(0:lmax))
+  allocate(ener_space(0:lmax))
+  allocate(ener_dset(0:lmax))
+  allocate(psi_space_left(0:lmax))
+  allocate(psi_dset_left(0:lmax))
 
   num_points = nint(Rmax/dr)
   Rmax = num_points*dr
@@ -330,7 +338,9 @@ use mpi
   end if 
 
   do l = l_start,l_stop,l_stride
-    print 10,'lB',l
+    write(tmp_character, "(A2,I4)")  'lB', l
+    call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
+    CHKERRA(ierr)
     nev = nmax - l
     allocate(V(0:num_points-1))
     allocate(VV(0:num_points-1,2))
@@ -436,19 +446,28 @@ use mpi
     call EPSGetConverged(eps,ncon,ierr);CHKERRA(ierr)
 
     if (ncon < nev) then
-      print*, 'ncon < nev'
-      print*, 'ncon = ', ncon, ' nev = ',nev
+      call PetscPrintf(MPI_COMM_SELF, "ncon < nev\n", ierr)
+      CHKERRA(ierr)
+      write(tmp_character, "(I4,I4)")  ncon, nev
+      call PetscPrintf(MPI_COMM_SELF,"ncon, nev = "//tmp_character//"\n", ierr)
+      CHKERRA(ierr)
       stop
     end if
 
     ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     !     Store solution
     ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
-    allocate(u_right(num_points,nev),E_right(nev),ix(num_points))
-    allocate(uu_right(num_points,nev,2),EE_right(nev,2))
+    allocate(u_right(num_points,nev))
+    allocate(E_right(nev))
+    allocate(ix(num_points))
+    allocate(uu_right(num_points,nev,2))
+    allocate(EE_right(nev,2))
     allocate(u_left(num_points,nev))
     allocate(uu_left(num_points,nev,2))
-    allocate(S(nev,nev),UL(nev,nev),UR(nev,nev),IPIV(nev))
+    allocate(S(nev,nev))
+    allocate(UL(nev,nev))
+    allocate(UR(nev,nev))
+    allocate(IPIV(nev))
 
     do i = 1, num_points
       ix(i) = i
@@ -457,10 +476,6 @@ use mpi
     do i = 0, nev-1
       call EPSGetEigenpair(eps,i,E_right(i+1),PETSC_NULL_SCALAR,Vi,PETSC_NULL_VEC,ierr);CHKERRA(ierr)
       call VecGetValues(Vi,num_points,ix,u_right(1:num_points,i+1),ierr);CHKERRA(ierr) 
-
-      if (abs(u_right(num_points,i+1)) .gt. 0.1 ) then
-        print*, u_right(num_points,i+1),l
-      end if
 
       u_right(num_points,i+1) = (0d0,0d0)
       rint = sum(u_right(:,i+1)*u_right(:,i+1))
@@ -491,14 +506,18 @@ use mpi
       call zgetrf(nev,nev,S,nev,IPIV,INFO)
 
       if (INFO .ne. 0) then
-        print*, "'LU' factorization failed"
-        print*, " exit code ", INFO
+        call PetscPrintf(MPI_COMM_SELF, "'LU' factorization failed\n", ierr)
+        CHKERRA(ierr)
+        write(tmp_character, "(A10,I4)")  "exit code ", INFO
+        call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
+        CHKERRA(ierr)
       end if 
 
       do i = 1, nev
         if (IPIV(i) .ne. i) then
-          print*,'Pivits are hapening',l
-          !stop
+          call PetscPrintf(MPI_COMM_SELF, "Pivits are hapening\n", ierr)
+          CHKERRA(ierr)
+          stop
         end if 
       end do 
 
@@ -524,7 +543,8 @@ use mpi
       call ztrtri('L','N',nev,UL,nev,INFO)
       
       if (INFO .ne. 0) then
-        print*, 'Inversion failed'
+        call PetscPrintf(MPI_COMM_SELF, 'Inversion failed\n', ierr)
+        CHKERRA(ierr)
         stop
       end if 
 
@@ -556,16 +576,24 @@ use mpi
     ! Writes u_right to Psi_l#l
     call h5dwrite_f( psi_dset_right(l), h5_kind, uu_right, psi_dims, h5_err)
 
-
     uu_left(:,:,1) = real(real(u_left))
     uu_left(:,:,2) = real(aimag(u_left))
 
     ! Writes u_left to Psi_l_l#l
     call h5dwrite_f( psi_dset_left(l), h5_kind, uu_left, psi_dims, h5_err)
 
-    deallocate(uu_right,EE_right,ix)
-    deallocate(u_left,u_right,E_right,uu_left)
-    deallocate(S,UL,UR,IPIV)
+    deallocate(uu_right)
+    deallocate(EE_right)
+    deallocate(ix)
+    deallocate(u_left)
+    deallocate(u_right)
+    deallocate(E_right)
+    deallocate(uu_left)
+    deallocate(S)
+    deallocate(UL)
+    deallocate(UR)
+    deallocate(IPIV)
+    
     ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     !     Display solution and clean up
     ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -573,7 +601,8 @@ use mpi
     call MatDestroy(H,ierr);CHKERRA(ierr)
     call MatDestroy(H,ierr);CHKERRA(ierr)
 
-    deallocate(V,VV)
+    deallocate(V)
+    deallocate(VV)
   end do 
 
     ! For each l close the hdf5 objects that were created in initialize
@@ -593,17 +622,22 @@ use mpi
   end do 
   
   deallocate(r)
+  deallocate(psi_space_right)
+  deallocate(psi_dset_right)
+  deallocate(ener_space)
+  deallocate(ener_dset)
+  deallocate(psi_space_left)
+  deallocate(psi_dset_left)
+
   ! Closes the hdf5 file
   call h5fclose_f( file_id, h5_err)
   call h5gclose_f( eps_group_id, h5_err)
   call h5fclose_f( param_file_id, h5_err)
+  call CPU_TIME(end_time)
+  write(tmp_character, "(ES9.2)")  end_time-start_time
+  call PetscPrintf(MPI_COMM_WORLD, 'time   :'//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
   call SlepcFinalize(ierr)
 
-  call CPU_TIME(end_time)
-
-  if(proc_id .eq. 0) then
-    print 20, 'time   :', end_time-start_time
-    20 format(A8,ES9.2)
-  end if 
 
 end program main 

@@ -5,6 +5,10 @@ program main
 #include <petsc/finclude/petscdmda.h>
 use hdf5
 use slepceps
+#if defined(__INTEL_COMPILER)
+use ifport
+#endif
+
   implicit none
 ! --------------------------------------------------------------------------
 ! Declarations
@@ -16,42 +20,46 @@ use slepceps
   PetscViewer         :: viewer
   PetscMPIInt         :: proc_id, num_proc, comm 
   PetscInt            :: l, n, nmax, lmax, size, left_index, h5_err
-  PetscInt            :: tdse_nmax, tdse_lmax
+  PetscInt            :: tdse_nmax, tdse_lmax, i, basis_local, status
   PetscScalar, allocatable :: val(:)
   PetscInt,    allocatable :: col(:)
   PetscReal, allocatable   :: El(:,:)
   PetscScalar, allocatable :: E(:,:)
   PetscReal  :: start_time, end_time
+  logical :: skip
   integer(HSIZE_T)    :: dims(1), ener_dims(1:2)
-  integer(SIZE_T), parameter :: sdim = 50 
-  integer(HID_T)      :: file_id, ener_id, h5_kind, param_file_id
-  integer(HID_T)      :: eps_group_id, memtype, eps_dat_id
-  integer(HID_T)      :: operators_group_id, operators_dat_id
-  integer(HID_T)      :: tdse_group_id, tdse_dat_id
-  character(len = 15) :: label ! File name without .h5 extension
-  character(len = 3)  :: strl  ! file number (l converted to a string)
-  character(len = 6)  :: fmt   ! format descriptor
-  character(len = 30) :: file_name
-  character(len = 12) :: ener_name
-  character(len = 50) :: tmp_character
+  integer(SIZE_T), parameter :: sdim = 300 
+  integer(HID_T)       :: file_id, ener_id, h5_kind, param_file_id
+  integer(HID_T)       :: eps_group_id, memtype, eps_dat_id
+  integer(HID_T)       :: operators_group_id, operators_dat_id
+  integer(HID_T)       :: tdse_group_id, tdse_dat_id
+  character(len = 15)  :: label ! File name without .h5 extension
+  character(len = 3)   :: strl  ! file number (l converted to a string)
+  character(len = 6)   :: fmt   ! format descriptor
+  character(len = 30)  :: file_name
+  character(len = 12)  :: ener_name
+  character(len = 300) :: tmp_character, basis_directory, working_directory
   MatType :: mat_type
+  PetscInt,   allocatable  :: block_n(:), block_l(:)
+  integer(HID_T)      :: block_group_id, block_dat_id
+  PetscInt            :: num_block
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
   call CPU_TIME(start_time)
 
-  10 format(A2,I4)
-
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
-    print*,'Unable to initialize PETSc'
+    call PetscPrintf(MPI_COMM_WORLD, 'Unable to initialize PETSc\n', ierr)
+    CHKERRA(ierr)
     stop
   endif
 
   ! Opens hdf5 to read in the label.h5 file 
   call h5open_f( h5_err)
-  if ( h5_err /= 0 ) then
-    print*,'h5open_f failed'
+  if ( h5_err .ne. 0 ) then
+    call PetscPrintf(MPI_COMM_WORLD, 'h5open_f failed\n', ierr)
+    CHKERRA(ierr)
     stop
   end if
 
@@ -76,6 +84,14 @@ use slepceps
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, nmax, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
 
+  call h5dopen_f(eps_group_id, "location", eps_dat_id, h5_err)
+  call h5dread_f(eps_dat_id, memtype, basis_directory, dims, h5_err)
+  call h5dclose_f(eps_dat_id, h5_err)
+
+  call h5dopen_f(eps_group_id, "local", eps_dat_id, h5_err)
+  call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, basis_local, dims, h5_err)
+  call h5dclose_f(eps_dat_id, h5_err)
+
   call h5gopen_f(param_file_id, "TDSE", tdse_group_id, h5_err)
 
   call h5dopen_f(tdse_group_id, "l_max", tdse_dat_id, h5_err)
@@ -87,6 +103,7 @@ use slepceps
   call h5dclose_f( tdse_dat_id, h5_err)
 
   call h5gopen_f(param_file_id, "operators", operators_group_id, h5_err)
+
   call h5dopen_f(operators_group_id, "mat_type", operators_dat_id, h5_err)
   call h5dread_f(operators_dat_id, memtype, tmp_character,dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
@@ -95,9 +112,29 @@ use slepceps
   else if (trim(tmp_character) .eq. "MATAIJ") then
     mat_type = MATAIJ
   else 
-    print*, "mat_type not supported defaulting to MATAIJ"
+    call PetscPrintf(MPI_COMM_WORLD, "mat_type not supported defaulting to MATAIJ\n", ierr)
+    CHKERRA(ierr)
     mat_type = MATAIJ   
   end if 
+
+  call h5gopen_f(param_file_id, "block_state", block_group_id, h5_err)
+  dims(1) = 1
+  call h5dopen_f(block_group_id, "num_block", block_dat_id, h5_err)
+  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, num_block, dims, h5_err)
+  call h5dclose_f(block_dat_id, h5_err)
+
+  allocate(block_n(num_block))
+  allocate(block_l(num_block))
+  
+  dims(1) = num_block
+
+  call h5dopen_f(block_group_id, "n_index", block_dat_id, h5_err)
+  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_n, dims, h5_err)
+  call h5dclose_f(block_dat_id, h5_err)
+
+  call h5dopen_f(block_group_id, "l_index", block_dat_id, h5_err)
+  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_l, dims, h5_err)
+  call h5dclose_f(block_dat_id, h5_err)
 
   call MPI_Comm_rank(comm,proc_id,ierr)
   CHKERRA(ierr)
@@ -116,8 +153,10 @@ use slepceps
     tdse_lmax + 1
   endif 
 
+  status = getcwd(working_directory)
+  status = chdir(trim(basis_directory))
   ! Adds the .h5 extension to the input file 
-  file_name = trim(label)//'.h5'
+  file_name = trim(label)//'.h5' 
 
   ! Opens the above file
   call h5fopen_f( trim(file_name), H5F_ACC_RDWR_F, file_id, h5_err)
@@ -140,7 +179,8 @@ use slepceps
   call MatGetOwnershipRange(H0,i_start,i_end,ierr)
   CHKERRA(ierr)
 
-  allocate(col(tdse_nmax),val(tdse_nmax))
+  allocate(col(tdse_nmax))
+  allocate(val(tdse_nmax))
 
 
   l_i_start = -1
@@ -160,7 +200,9 @@ use slepceps
 
   ! Itterate over angular momentum to calculate the matrix elements
   do l = l_i_start,l_i_end  
-    print 10, 'l0', l
+    write(tmp_character, "(A2,I4)")  'l0', l
+    call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
+    CHKERRA(ierr)
     ! Figure out how many digits are needed for the input file
     if ( l .le. 9 ) then
       fmt = '(I1.1)'
@@ -188,20 +230,36 @@ use slepceps
     ! Closes the dataset
     call h5dclose_f( ener_id, h5_err)
     ! For each l value we compute the corresponding matrix elements of H0
-    
+    skip = .false.
     do n=l+1,tdse_nmax    
-      ! Here I convert the n and l value to its corresponding left_index 
-      left_index =  -1 + n - (l*(1 + l - 2*tdse_nmax))/2
-      ! Convert the real energy to a PetscScalar
-      val(1) = E(n-l,l)  
-      ! Insert the energy into the field free matrix 
-      call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
-      CHKERRA(ierr)
+      if (num_block .ne. 0) then
+        do i = 1,num_block
+          if ( (block_n(i) .eq. n) .and. block_l(i) .eq. l) then
+            skip = .true.
+          end if
+        end do 
+      end if 
+      if (.not. skip) then
+        ! Here I convert the n and l value to its corresponding left_index 
+        left_index =  -1 + n - (l*(1 + l - 2*tdse_nmax))/2
+        ! Convert the real energy to a PetscScalar
+        val(1) = E(n-l,l)  
+        ! Insert the energy into the field free matrix 
+        call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
+        CHKERRA(ierr)
+      else 
+        ! Here I convert the n and l value to its corresponding left_index 
+        left_index =  -1 + n - (l*(1 + l - 2*tdse_nmax))/2
+        ! Convert the real energy to a PetscScalar
+        val(1) = 0d0  
+        ! Insert the energy into the field free matrix 
+        call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
+        CHKERRA(ierr)
+      end if 
+      skip = .false.
     enddo
   enddo
-
-  deallocate(col,val)
-
+  status = chdir(trim(working_directory))
   ! Build the matrix
   call MatAssemblyBegin(H0,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)
@@ -217,23 +275,27 @@ use slepceps
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
-  ! Clear memory 
+  ! Clear memory
+  deallocate(E)
+  deallocate(El) 
+  deallocate(col)
+  deallocate(val)
+  deallocate(block_l)
+  deallocate(block_n)
+
   call MatDestroy(H0,ierr)
   CHKERRA(ierr)
-  deallocate(E,El)
   call h5fclose_f( file_id, h5_err)
   call h5gclose_f( eps_group_id, h5_err)
   call h5gclose_f( operators_group_id, h5_err)
   call h5gclose_f( tdse_group_id, h5_err)
+  call h5gclose_f( block_group_id, h5_err)
   call h5fclose_f( param_file_id, h5_err)
   call h5close_f( h5_err)
-
-  call PetscFinalize(ierr)
   call CPU_TIME(end_time)
-  
-  if(proc_id .eq. 0) then
-    print 20, 'time   :', end_time-start_time
-    20 format(A8,ES9.2)
-  end if 
+  write(tmp_character, "(ES9.2)")  end_time-start_time
+  call PetscPrintf(MPI_COMM_WORLD, 'time   :'//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
+  call PetscFinalize(ierr)
 
 end program main

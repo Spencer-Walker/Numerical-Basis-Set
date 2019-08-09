@@ -42,15 +42,17 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   PetscScalar     :: dotProduct
   PetscErrorCode  :: ierr
   PetscInt        :: step
+  character(9)   :: tstring
   
   call TSGetStepNumber(ts,step,ierr)
   CHKERRA(ierr)
 
   dt = t-told
-  if (user .eq. 0) then
-    if (mod(floor(t/dt),100) .eq. 0) then
-      print*, t
-    end if 
+
+  if (mod(floor(t/dt),100) .eq. 0) then
+    write(tstring, "(ES9.2)") t
+    call PetscPrintf(MPI_COMM_WORLD, "t = "//tstring//"\n", ierr)
+    CHKERRA(ierr)
   end if 
 
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
@@ -73,7 +75,6 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
     call TSSetSolution(ts, tmp, ierr)
     CHKERRA(ierr)
   end if 
-
 
   told  = t
 
@@ -105,6 +106,7 @@ use hdf5
   PetscScalar         :: norm, val
   PetscInt            :: nmax,lmax,size,nabs,labs,index
   PetscInt            :: n,l, h5_err, mask_pow, num_states
+  PetscInt            :: operators_local
   integer(HSIZE_T)    :: dims(1)
   PetscReal           :: dt
   PetscReal           :: maxtime
@@ -118,9 +120,9 @@ use hdf5
   integer(HID_T)      :: start_group_id, start_dat_id
   integer(HID_T)      :: laser_group_id, laser_dat_id
   integer(HID_T)      :: tdse_group_id, tdse_dat_id
-  character(len = 50) :: tmp_character
+  character(len = 300) :: tmp_character, operator_directory
   MatType             :: mat_type
-  integer(SIZE_T), parameter :: sdim = 50 
+  integer(SIZE_T), parameter :: sdim = 300 
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
   PetscReal,  allocatable :: EE(:)
   PetscInt,   allocatable  :: init_n(:), init_l(:)
@@ -132,15 +134,16 @@ use hdf5
 
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
-    print*,'Unable to initialize PETSc'
+    call PetscPrintf(MPI_COMM_WORLD, 'Unable to initialize PETSC\n', ierr)
+    CHKERRA(ierr)
     stop
   endif
 
-  print*,"h5open_f"
   ! Opens hdf5 to read in the label.h5 file 
   call h5open_f( h5_err)
   if ( h5_err /= 0 ) then
-    print*,'h5open_f failed'
+    call PetscPrintf(MPI_COMM_WORLD, 'h5open_f failed\n', ierr)
+    CHKERRA(ierr)
     stop
   end if
 
@@ -157,13 +160,9 @@ use hdf5
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, lmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
-  print*, "lmax",lmax
-
   call h5dopen_f(tdse_group_id, "n_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, nmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-
-  print*, "nmax",nmax
 
   call H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
   call H5Tset_size_f(memtype, sdim, h5_err)
@@ -171,32 +170,22 @@ use hdf5
   call h5dopen_f(tdse_group_id, "mask_type", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, memtype, mask, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-  
-  print*, "mask_type", mask
 
   call h5dopen_f(tdse_group_id, "mask_present", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, masking_function_present, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-  
-  print*, "mask_present", masking_function_present
 
   call h5dopen_f(tdse_group_id, "mask_n_abs", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, nabs, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
-  print*, "mask_n_abs", nabs
-
   call h5dopen_f(tdse_group_id, "mask_l_abs", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, labs, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
-  print*, "mask_l_abs", labs
-
   call h5dopen_f(tdse_group_id, "mask_pow", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_DOUBLE, mask_pow, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-
-  print*, "mask_pow", mask_pow
 
   call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
 
@@ -204,44 +193,34 @@ use hdf5
   call h5dread_f(eps_dat_id, memtype, label, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
 
-  print*, "label", label
-
   call h5gopen_f(param_file_id, "start_state", start_group_id, h5_err)
   dims(1) = 1
   call h5dopen_f(start_group_id, "num_states", start_dat_id, h5_err)
   call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, num_states, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
-  
-  print*, "num_states"
 
   allocate(init_n(num_states))
   allocate(init_l(num_states))
   allocate(init_amp(num_states))
   allocate(init_phase(num_states))
+  
   dims(1) = num_states
+
   call h5dopen_f(start_group_id, "n_index", start_dat_id, h5_err)
   call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, init_n, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
-  
-  print*, "init_n", init_n
 
   call h5dopen_f(start_group_id, "l_index", start_dat_id, h5_err)
   call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, init_l, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
 
-  print*, "init_l", init_l
-
   call h5dopen_f(start_group_id, "amplitude", start_dat_id, h5_err)
   call h5dread_f(start_dat_id, H5T_NATIVE_DOUBLE, init_amp, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
 
-  print*, "init_amp", init_amp
-
   call h5dopen_f(start_group_id, "phase", start_dat_id, h5_err)
   call h5dread_f(start_dat_id, H5T_NATIVE_DOUBLE, init_phase, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
-  
-  print*, "init_phase", init_phase
 
   ! If nmax <= lmax+1 we chose the normal basis size but if it is large 
   ! the basis is truncated in l
@@ -251,7 +230,6 @@ use hdf5
       size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
           lmax + 1
   endif
-  print*, "size",size
 
   ! These are the default values in atomic units the user is free to change 
   ! them as an extra argument when running the program 
@@ -260,7 +238,9 @@ use hdf5
   call h5dread_f(tdse_dat_id, H5T_NATIVE_DOUBLE, dt, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
-  print*, 'dt =',dt 
+  write(tmp_character,"(ES9.2)") dt
+  call PetscPrintf(MPI_COMM_WORLD, 'dt ='//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
 
   call h5gopen_f(param_file_id, "operators", operators_group_id, h5_err)
 
@@ -272,18 +252,33 @@ use hdf5
   else if (trim(tmp_character) .eq. "MATAIJ") then
     mat_type = MATAIJ
   else 
-    print*, "mat_type not supported defaulting to MATAIJ"
+    call PetscPrintf(MPI_COMM_WORLD,  "mat_type not supported defaulting to MATAIJ\n", ierr)
+    CHKERRA(ierr)
     mat_type = MATAIJ   
   end if 
 
-  print*, "mat_type", mat_type
+  call h5dopen_f(operators_group_id, "location", operators_dat_id, h5_err)
+  call h5dread_f(operators_dat_id, memtype, operator_directory, dims, h5_err)
+  call h5dclose_f(operators_dat_id, h5_err)
+
+  call h5dopen_f(operators_group_id, "local", operators_dat_id, h5_err)
+  call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, operators_local, dims, h5_err)
+  call h5dclose_f(operators_dat_id, h5_err)
 
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
 ! --------------------------------------------------------------------------
-  call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-  & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
-  CHKERRA(ierr)
+  if ( operators_local .eq. 0) then
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(operator_directory)//'/'//&
+    & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  else 
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  end if 
+
   call MatCreate(MPI_COMM_WORLD,Z_scale,ierr)
   CHKERRA(ierr)
   call MatSetSizes(Z_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
@@ -306,9 +301,17 @@ use hdf5
 ! --------------------------------------------------------------------------
 ! Create dipole acceleration matrix
 ! --------------------------------------------------------------------------
-  call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-  & trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
-  CHKERRA(ierr)
+  if ( operators_local .eq. 0) then
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(operator_directory)//'/'//&
+      trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  else 
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  end if 
+  
   call MatCreate(MPI_COMM_WORLD,A,ierr)
   CHKERRA(ierr)
   call MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
@@ -329,9 +332,17 @@ use hdf5
 ! --------------------------------------------------------------------------
 ! Create the H0_scale matrix
 ! --------------------------------------------------------------------------
-  call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-  & trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr)
-  CHKERRA(ierr)
+  if ( operators_local .eq. 0) then
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(operator_directory)//'/'//&
+    & trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  else 
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(label)//'_fieldFreeMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  end if 
+
   call MatCreate(MPI_COMM_WORLD,H0_scale,ierr)
   CHKERRA(ierr)
   call MatSetSizes(H0_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
@@ -367,8 +378,8 @@ use hdf5
   call MatCopy(H0_scale,J,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   told = 0.d0
-!  call MatAXPY(J,(0.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
-!  CHKERRA(ierr)
+  call MatAXPY(J,(0.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+  CHKERRA(ierr)
 
 ! --------------------------------------------------------------------------
 ! Propagate
@@ -445,7 +456,6 @@ use hdf5
   call TSSetRHSJacobian(ts,J,J,RHSMatrixSchrodinger,0,ierr)
   CHKERRA(ierr)
 
-  print*,"E"
   call h5gopen_f(param_file_id, "laser", laser_group_id, h5_err)
   
   call h5dopen_f(laser_group_id, "E_length", laser_dat_id, h5_err)
@@ -456,7 +466,6 @@ use hdf5
   allocate(EE(0:max_steps-1))
   
   dims(1) = max_steps
-  print*, "dims",dims(1)
   call h5dopen_f(laser_group_id, "E", laser_dat_id, h5_err)
   call h5dread_f(laser_dat_id, H5T_NATIVE_DOUBLE, EE, dims, h5_err)
   call h5dclose_f( laser_dat_id, h5_err)
@@ -472,7 +481,10 @@ use hdf5
 
   maxtime = max_steps*dt
 
-  print*, "maxtime", maxtime
+  write(tmp_character,"(ES9.2)") maxtime
+
+  call PetscPrintf(MPI_COMM_WORLD, 'maxtime ='//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
 
   ! Here we set the maximum time maxtime
   call TSSetMaxTime(ts,maxtime,ierr)
@@ -516,6 +528,8 @@ use hdf5
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_psi.output',&
   & viewer,ierr)
   CHKERRA(ierr)
+  call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+  CHKERRA(ierr)
   call VecView(psi,viewer,ierr)
   CHKERRA(ierr)
   call VecAbs(psi,ierr)
@@ -531,6 +545,8 @@ use hdf5
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAcceleration.output',&
   & viewer,ierr)
   CHKERRA(ierr)
+  call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+  CHKERRA(ierr)
   call VecView(dipoleA,viewer,ierr)
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
@@ -538,16 +554,33 @@ use hdf5
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
   & viewer,ierr)
   CHKERRA(ierr)
+  call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+  CHKERRA(ierr)
   call VecView(psi,viewer,ierr)
   CHKERRA(ierr)
   call VecSum(psi,norm,ierr)
   CHKERRA(ierr)
-  print*,'Norm is',norm
 
+  write(tmp_character, "(ES9.2)")  real(real(norm))
+  call PetscPrintf(MPI_COMM_WORLD, 'Norm ='//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
+  
 ! --------------------------------------------------------------------------
 ! Clear memory
 ! --------------------------------------------------------------------------
-  print*,'before clear memory'
+  deallocate(E)
+  deallocate(EE)
+  deallocate(init_n)
+  deallocate(init_l)
+  deallocate(init_amp)
+  deallocate(init_phase)
+
+  call h5gclose_f( eps_group_id, h5_err)
+  call h5gclose_f( operators_group_id, h5_err)
+  call h5gclose_f( tdse_group_id, h5_err)
+  call h5fclose_f( param_file_id, h5_err)
+  call h5close_f( h5_err)
+
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
   call MatDestroy(H0_scale,ierr)
@@ -562,13 +595,14 @@ use hdf5
   CHKERRA(ierr)
   call VecDestroy(dipoleA,ierr)
   CHKERRA(ierr)
+  call CPU_TIME(end_time)
+  write(tmp_character, "(ES9.2)")  end_time-start_time
+  call PetscPrintf(MPI_COMM_WORLD, 'time   :'//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
+  write(tmp_character,"(ES9.2)") maxtime
+  call PetscPrintf(MPI_COMM_WORLD, 'maxtime ='//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
   call PetscFinalize(ierr)
   CHKERRA(ierr)
-  call CPU_TIME(end_time)
-  
-  if(proc_id .eq. 0) then
-    print 20, 'time   :', end_time-start_time
-    20 format(A8,ES9.2)
-  end if 
-  deallocate(E,EE,init_n,init_l,init_amp,init_phase)
+
 end program Main

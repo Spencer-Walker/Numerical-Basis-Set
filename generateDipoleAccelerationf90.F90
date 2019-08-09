@@ -1,9 +1,12 @@
 ! This program generates the dipole acceleration operator 
 program main
 #include <slepc/finclude/slepceps.h>
-  use slepceps
-  use hdf5
-  implicit none
+use slepceps
+use hdf5
+#if defined(__INTEL_COMPILER)
+use ifport
+#endif
+implicit none
 ! --------------------------------------------------------------------------
 ! Declarations
 ! --------------------------------------------------------------------------
@@ -18,15 +21,17 @@ program main
   PetscInt            :: l_i_start, l_i_end, n, l, i
   PetscInt            :: itter, n1, n2, nmax, l1, l2, lmax, size
   PetscInt            :: num_points, h5_err, tdse_nmax, tdse_lmax
+  PetscInt            :: status, basis_local
   PetscReal           :: start_time, end_time
   PetscReal,      allocatable :: r(:), y(:,:,:)
   PetscScalar,    allocatable :: val_right(:), val_left(:), v1(:), v2(:)
   PetscScalar,    allocatable :: u_right(:,:,:), u_left(:,:,:)
   PetscInt,       allocatable :: col(:)
   PetscReal,      allocatable :: clebsch_gordan(:)
+  logical             :: skip
   integer(HID_T)      :: psi_id, h5_kind
   integer(HSIZE_T)    :: psi_dims(1:3), dims(1)
-  integer(SIZE_T), parameter :: sdim = 50 
+  integer(SIZE_T), parameter :: sdim = 300 
   integer(HID_T)      :: file_id, param_file_id
   integer(HID_T)      :: eps_group_id, memtype, eps_dat_id
   integer(HID_T)      :: operators_group_id, operators_dat_id
@@ -36,26 +41,29 @@ program main
   character(len = 12) :: psi_name
   character(len = 6)  :: fmt ! format descriptor
   character(len = 30) :: file_name
-  character(len = 50) :: tmp_character
+  character(len = 300) :: tmp_character, basis_directory, working_directory
   MatType :: mat_type
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
+  PetscInt,   allocatable  :: block_n(:), block_l(:)
+  integer(HID_T)      :: block_group_id, block_dat_id
+  PetscInt            :: num_block
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
   call CPU_TIME(start_time)
   
-  10 format(A2,I4)
-
-  call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
+  call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
-    print*,'SlepcInitialize failed'
+    call PetscPrintf(MPI_COMM_WORLD, 'Unable to initialize PETSc\n', ierr)
+    CHKERRA(ierr)
     stop
   endif
 
   ! Opens hdf5 to read in the label.h5 file 
   call h5open_f( h5_err)
-  if ( h5_err /= 0 ) then
-    print*,'h5open_f failed'
+  if ( h5_err .ne. 0 ) then
+    call PetscPrintf(MPI_COMM_WORLD, 'h5open_f failed\n', ierr)
+    CHKERRA(ierr)
     stop
   end if
 
@@ -88,6 +96,14 @@ program main
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, nmax, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
 
+  call h5dopen_f(eps_group_id, "location", eps_dat_id, h5_err)
+  call h5dread_f(eps_dat_id, memtype, basis_directory, dims, h5_err)
+  call h5dclose_f(eps_dat_id, h5_err)
+
+  call h5dopen_f(eps_group_id, "local", eps_dat_id, h5_err)
+  call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, basis_local, dims, h5_err)
+  call h5dclose_f(eps_dat_id, h5_err)
+
   call h5gopen_f(param_file_id, "TDSE", tdse_group_id, h5_err)
 
   call h5dopen_f(tdse_group_id, "l_max", tdse_dat_id, h5_err)
@@ -107,10 +123,29 @@ program main
   else if (trim(tmp_character) .eq. "MATAIJ") then
     mat_type = MATAIJ
   else 
-    print*, "mat_type not supported defaulting to MATAIJ"
+    call PetscPrintf(MPI_COMM_WORLD, "mat_type not supported defaulting to MATAIJ\n", ierr)
+    CHKERRA(ierr)
     mat_type = MATAIJ   
   end if 
 
+  call h5gopen_f(param_file_id, "block_state", block_group_id, h5_err)
+  dims(1) = 1
+  call h5dopen_f(block_group_id, "num_block", block_dat_id, h5_err)
+  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, num_block, dims, h5_err)
+  call h5dclose_f(block_dat_id, h5_err)
+
+  allocate(block_n(num_block))
+  allocate(block_l(num_block))
+  
+  dims(1) = num_block
+
+  call h5dopen_f(block_group_id, "n_index", block_dat_id, h5_err)
+  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_n, dims, h5_err)
+  call h5dclose_f(block_dat_id, h5_err)
+
+  call h5dopen_f(block_group_id, "l_index", block_dat_id, h5_err)
+  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_l, dims, h5_err)
+  call h5dclose_f(block_dat_id, h5_err)
 
   num_points = nint(Rmax/h)
 
@@ -118,7 +153,9 @@ program main
   CHKERRA(ierr)
   call MPI_Comm_size(comm,num_proc,ierr)
   CHKERRA(ierr)
-
+  
+  status = getcwd(working_directory)
+  status = chdir(trim(basis_directory))
   ! Adds the .h5 extension to the input file 
   file_name = trim(label)//'.h5'
 
@@ -235,12 +272,13 @@ program main
     deallocate(y)
   end do
 
+  
 ! --------------------------------------------------------------------------
 ! Create r Vector
 ! --------------------------------------------------------------------------
   r(:) = (/(i*h,i = 1,num_points)/)
   r(:) = r(:)**(-2.d0)
-! -----------------------------------------------------
+! --------------------------------------------------------------------------
 ! Load in Clebsch Gordan Coefficients from .bin File
 ! --------------------------------------------------------------------------
 
@@ -257,7 +295,9 @@ program main
     ! for l+/-1
     ! we will compute the (l,l+1) elements only and take care of the rest 
     ! using the fact that Z is hermetian. 
-    print 10, 'lD', l
+    write(tmp_character, "(A2,I4)")  'l1', l
+    call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
+    CHKERRA(ierr)
     l1 = l
     l2 = l + 1
     ! For each l value we compute the corresponding matrix elements of Z
@@ -267,30 +307,44 @@ program main
       if (left_index < i_end .and. left_index >= i_start) then 
         ! Here I convert the n2 and l2 value to its corresponding index
         itter = 1
+        skip = .false.
         do n2=l2+1,tdse_nmax
-          right_index = -1 + n2 - (l2*(1 + l2 - 2*tdse_nmax))/2
-          ! I create a vector of indicies corresponding to what columns I 
-          ! am setting for each row
-          col(itter) = right_index
-          
-          ! Here I compute matrix elements of the r operator as a weighted 
-          ! inner product
-          v1 = u_left(:,n1-l1,l1)
-          v2 = u_right(:,n2-l2,l2)
-          rint = sum(v1*r*v2)
+          if (num_block .ne. 0) then
+            do i = 1,num_block
+              if ( (block_n(i) .eq. n1) .and. block_l(i) .eq. l1) then
+                skip = .true.
+              end if
+              if ( (block_n(i) .eq. n2) .and. block_l(i) .eq. l2) then
+                skip = .true.
+              end if
+            end do 
+          end if 
+          if (.not. skip) then
+            right_index = -1 + n2 - (l2*(1 + l2 - 2*tdse_nmax))/2
+            ! I create a vector of indicies corresponding to what columns I 
+            ! am setting for each row
+            col(itter) = right_index
 
-          ! Here I compute matrix elements corresponding to the indicies in 
-          ! the col vector
-          val_right(itter) = 2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint
-          if (mat_type .ne. MATSBAIJ) then
-            v1 = u_left(:,n2-l2,l2)
-            v2 = u_right(:,n1-l1,l1)
+            ! Here I compute matrix elements of the r operator as a weighted 
+            ! inner product
+            v1 = u_left(:,n1-l1,l1)
+            v2 = u_right(:,n2-l2,l2)
             rint = sum(v1*r*v2)
 
-            val_left(itter) = 2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint
-          end if 
+            ! Here I compute matrix elements corresponding to the indicies in 
+            ! the col vector
+            val_right(itter) = 2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint
+            if (mat_type .ne. MATSBAIJ) then
+              v1 = u_left(:,n2-l2,l2)
+              v2 = u_right(:,n1-l1,l1)
+              rint = sum(v1*r*v2)
 
-          itter = itter + 1
+              val_left(itter) = 2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint
+            end if 
+
+            itter = itter + 1
+          end if 
+          skip = .false.
         end do
 
         ! Now that all matrix elements have been computed for the n1 state for
@@ -314,6 +368,7 @@ program main
     ! next l values
   end do L_LP_LOOP
 
+  status = chdir(trim(working_directory))
   ! We finish building Z now that we've finished adding elements
   call MatAssemblyBegin(Z,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)
@@ -332,28 +387,30 @@ program main
   ! Now that Z is saved to memory we clear out memory and exit
   call MatDestroy(Z,ierr)
   CHKERRA(ierr)
-  deallocate(val_right,val_left)
+  
+  deallocate(val_right)
+  deallocate(val_left)
   deallocate(col)
-
   deallocate(clebsch_gordan)
   deallocate(v1)
   deallocate(v2)
-  deallocate(u_right,u_left)
+  deallocate(u_right)
+  deallocate(u_left)
+  deallocate(r)
+  deallocate(block_l)
+  deallocate(block_n)
+
   call h5fclose_f( file_id, h5_err)
   call h5gclose_f( eps_group_id, h5_err)
   call h5gclose_f( operators_group_id, h5_err)
   call h5gclose_f( tdse_group_id, h5_err)
+  call h5gclose_f( block_group_id, h5_err)
   call h5fclose_f( param_file_id, h5_err)
   call h5close_f( h5_err)
+  call CPU_TIME(end_time)
+  write(tmp_character, "(ES9.2)")  end_time-start_time
+  call PetscPrintf(MPI_COMM_WORLD, 'time   :'//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
   call SlepcFinalize(ierr)
 
-  call CPU_TIME(end_time)
-  
-  if(proc_id .eq. 0) then
-    print 20, 'time   :', end_time-start_time
-    20 format(A8,ES9.2)
-  end if 
-
 end program main
-      
-    
