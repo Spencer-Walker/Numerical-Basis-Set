@@ -22,9 +22,9 @@ fig = plt.figure(figsize=(24, 18), dpi=80)
 energy =  0.056953098011833
 data = np.array(dipole_acceleration)
 data = data
-data = data * np.blackman(data.shape[0])
+#data = data * np.blackman(data.shape[0])
 padd2 = 2**np.ceil(np.log2(data.shape[0] * 4))
-paddT = 568.7*padd2 / data.shape[0]
+paddT = 2210.85*padd2 / data.shape[0]
 dH = 2 * np.pi / paddT / energy
 if np.max(data) > 1e-19:
   data = np.absolute(
@@ -34,7 +34,7 @@ if np.max(data) > 1e-19:
           int(np.ceil((padd2 - data.shape[0]) / 2))),
         'constant',
         constant_values=(0.0, 0.0))))
-data /= data.max()
+#data /= data.max()
 data = data**2.0
 plt.semilogy(
   np.arange(data.shape[0]) * dH,
@@ -43,10 +43,10 @@ plt.ylabel("HHG Spectrum (a.u.)")
 plt.title("HHG Spectrum")
 plt.legend()
 x_min = 0
-x_max = 55
+x_max = 12
 plt.xticks(np.arange(x_min + 1, x_max + 1, 2.0))
 plt.xlim([x_min, x_max])
-plt.ylim([1e-10, 1])
+plt.ylim([1e-6, 1e6])
 plt.grid(True, which='both')
 plt.tight_layout()
 fig.savefig(os.getcwd()+'/HHG_Spectrum.png')

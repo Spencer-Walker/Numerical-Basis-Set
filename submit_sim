@@ -8,4 +8,7 @@
 #SBATCH -t 1-00:00:00            # Run time (hh:mm:ss)
 #SBATCH --mem=26G
 
-mpirun -np 32 --host photon9,photon10 ./basisf90
+bash
+conda activate obspy
+mpirun -np 32 --host photon9,photon10 python wavelet.py
+

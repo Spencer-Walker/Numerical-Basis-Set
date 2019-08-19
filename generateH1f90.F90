@@ -48,7 +48,7 @@ implicit none
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
   PetscInt,   allocatable  :: block_n(:), block_l(:)
   integer(HID_T)      :: block_group_id, block_dat_id
-  PetscInt            :: num_block
+  PetscInt            :: num_block, observables_only
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
@@ -137,6 +137,11 @@ implicit none
 
   call h5gopen_f(param_file_id, "block_state", block_group_id, h5_err)
   dims(1) = 1
+  call h5dopen_f(block_group_id, "observables_only", block_dat_id, h5_err)
+  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, observables_only, dims, h5_err)
+  call h5dclose_f(block_dat_id, h5_err)
+
+
   call h5dopen_f(block_group_id, "num_block", block_dat_id, h5_err)
   call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, num_block, dims, h5_err)
   call h5dclose_f(block_dat_id, h5_err)
@@ -315,7 +320,7 @@ implicit none
         itter = 1
         skip = .false.
         do n2=l2+1,tdse_nmax
-          if (num_block .ne. 0) then
+          if ( (num_block .ne. 0 ) .and. observables_only .eq. 0) then
             do i = 1,num_block
               if ( (block_n(i) .eq. n1) .and. block_l(i) .eq. l1) then
                 skip = .true.
