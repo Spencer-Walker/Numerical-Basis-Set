@@ -18,13 +18,31 @@ module time_propagation_module
 #include <petsc/finclude/petscts.h>
   use petscts
   implicit none
-  Vec :: tmp, mask_vector, dipoleA
+  Vec :: tmp, mask_vector, dipoleAX, dipoleAY, dipoleAZ
   PetscReal :: told 
-  Mat :: Z_scale,H0_scale,A
+  PetscInt :: mmax
+  Mat :: Z_scale,X_scale,Y_scale,H0_scale,AX,AY,AZ
   PetscReal :: omega_vector_potential
-  PetscScalar, allocatable :: E(:)
+  PetscScalar, allocatable :: E(:,:)
   PetscInt  :: masking_function_present
 end module time_propagation_module
+
+! This program generates the dipole acceleration operator 
+function indicies(n,l,m,nmax,mmax) 
+  implicit none
+  integer, intent(in)  :: n,l,m,nmax,mmax
+  integer :: indicies
+  integer :: first, rest
+  if (l .le. mmax + 1) then
+    first = (2*nmax-1)*l*(l-1)/2+ nmax*l - 2*(l-1)*l*(2*l-1)/6
+  else 
+    first = (2*nmax-1)*mmax*(mmax+1)/2+ nmax*(mmax+1) - 2*mmax*(mmax+1)*(2*mmax+1)/6
+    first = first + (2*mmax+1)*( nmax*(l-1-mmax) - l*(l-1)/2 + mmax*(mmax + 1)/2)
+  end if
+  rest =  (m + min(l,mmax))*(nmax-l) + n - l - 1;
+
+  indicies = first + rest
+end function indicies
 
 ! --------------------------------------------------------------------------
 ! Subroutines 
@@ -48,27 +66,54 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   CHKERRA(ierr)
 
   dt = t-told
-
   if (mod(floor(t/dt),100) .eq. 0) then
     write(tstring, "(ES9.2)") t
     call PetscPrintf(MPI_COMM_WORLD, "t = "//tstring//"\n", ierr)
     CHKERRA(ierr)
   end if 
-
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
-
-  call MatMult(A,psi,tmp,ierr)
+  call MatMult(AZ,psi,tmp,ierr)
   CHKERRA(ierr)
   call VecDot(psi,tmp,dotProduct,ierr)
   CHKERRA(ierr)
-  call VecSetValue(dipoleA,step,dotProduct,INSERT_VALUES,ierr)
+  call VecSetValue(dipoleAZ,step,dotProduct,INSERT_VALUES,ierr)
   CHKERRA(ierr)
+  if ( mmax .ne. 0 ) then
+    call MatMult(AX,psi,tmp,ierr)
+    CHKERRA(ierr)
+    call VecDot(psi,tmp,dotProduct,ierr)
+    CHKERRA(ierr)
+    call VecSetValue(dipoleAX,step,dotProduct,INSERT_VALUES,ierr)
+    CHKERRA(ierr)
+    call MatMult(AY,psi,tmp,ierr)
+    CHKERRA(ierr)
+    call VecDot(psi,tmp,dotProduct,ierr)
+    CHKERRA(ierr)
+    call VecSetValue(dipoleAY,step,dotProduct,INSERT_VALUES,ierr)
+    CHKERRA(ierr)
+  end if
+
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
-  call MatAXPY(J,E(step),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
-  CHKERRA(ierr)
 
+
+!!  if ( dabs(dble(real(E(3,step)))) .ge. 1d-13) then
+    call MatAXPY(J,E(3,step),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
+    CHKERRA(ierr)
+!!  end if
+  if (mmax .ne. 0) then
+!!    if (dabs(dble(real(E(1,step)))) .ge. 1d-13) then
+      call MatAXPY(J,E(1,step),X_scale,SUBSET_NONZERO_PATTERN,ierr)
+      CHKERRA(ierr)
+!!    end if 
+    
+!!    if ( dabs(dble(real(E(2,step)))) .ge. 1d-13) then
+      call MatAXPY(J,E(2,step),Y_scale,SUBSET_NONZERO_PATTERN,ierr)
+      CHKERRA(ierr)
+ !!   end if 
+  end if
+ 
   if (masking_function_present .eq. 1) then
     call VecPointwiseMult(tmp, psi, mask_vector, ierr)
     CHKERRA(ierr)
@@ -88,6 +133,8 @@ program Main
 use time_propagation_module 
 use petscts
 use hdf5
+use fgsl
+use iso_c_binding
 #include <petsc/finclude/petscts.h>
   implicit none
 ! --------------------------------------------------------------------------
@@ -105,9 +152,9 @@ use hdf5
   PetscViewer         :: viewer
   PetscScalar         :: norm, val
   PetscInt            :: nmax,lmax,size,nabs,labs,index
-  PetscInt            :: n,l, h5_err, mask_pow, num_states
+  PetscInt            :: n, l, m, h5_err, mask_pow, num_states
   PetscInt            :: operators_local
-  integer(HSIZE_T)    :: dims(1)
+  integer(HSIZE_T)    :: dims(1), dims2(2)
   PetscReal           :: dt
   PetscReal           :: maxtime
   character(len=15)   :: mask
@@ -123,9 +170,10 @@ use hdf5
   character(len = 300) :: tmp_character, operator_directory
   MatType             :: mat_type
   integer(SIZE_T), parameter :: sdim = 300 
+  integer              :: indicies
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
-  PetscReal,  allocatable :: EE(:)
-  PetscInt,   allocatable  :: init_n(:), init_l(:)
+  PetscReal,  allocatable :: EE(:,:)
+  PetscInt,   allocatable  :: init_n(:), init_l(:), init_m(:)
   PetscReal,  allocatable :: init_amp(:), init_phase(:)
 ! --------------------------------------------------------------------------
 ! Beginning of Program
@@ -160,17 +208,14 @@ use hdf5
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, lmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
+  call h5dopen_f(tdse_group_id, "m_max", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, mmax, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
   call h5dopen_f(tdse_group_id, "n_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, nmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-
-  call H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
-  call H5Tset_size_f(memtype, sdim, h5_err)
   
-  call h5dopen_f(tdse_group_id, "mask_type", tdse_dat_id, h5_err)
-  call h5dread_f(tdse_dat_id, memtype, mask, dims, h5_err)
-  call h5dclose_f( tdse_dat_id, h5_err)
-
   call h5dopen_f(tdse_group_id, "mask_present", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, masking_function_present, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
@@ -189,18 +234,29 @@ use hdf5
 
   call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
 
+
+  call H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
+  call H5Tset_size_f(memtype, sdim, h5_err)
+
+  call h5dopen_f(tdse_group_id, "mask_type", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, memtype, mask, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
   call h5dopen_f(eps_group_id, "label", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, memtype, label, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
 
   call h5gopen_f(param_file_id, "start_state", start_group_id, h5_err)
+
   dims(1) = 1
+
   call h5dopen_f(start_group_id, "num_states", start_dat_id, h5_err)
   call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, num_states, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
 
   allocate(init_n(num_states))
   allocate(init_l(num_states))
+  allocate(init_m(num_states))
   allocate(init_amp(num_states))
   allocate(init_phase(num_states))
   
@@ -214,6 +270,10 @@ use hdf5
   call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, init_l, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
 
+  call h5dopen_f(start_group_id, "m_index", start_dat_id, h5_err)
+  call h5dread_f(start_dat_id, H5T_NATIVE_INTEGER, init_m, dims, h5_err)
+  call h5dclose_f(start_dat_id, h5_err)
+
   call h5dopen_f(start_group_id, "amplitude", start_dat_id, h5_err)
   call h5dread_f(start_dat_id, H5T_NATIVE_DOUBLE, init_amp, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
@@ -222,14 +282,8 @@ use hdf5
   call h5dread_f(start_dat_id, H5T_NATIVE_DOUBLE, init_phase, dims, h5_err)
   call h5dclose_f(start_dat_id, h5_err)
 
-  ! If nmax <= lmax+1 we chose the normal basis size but if it is large 
-  ! the basis is truncated in l
-  if(nmax .le. lmax+1) then
-      size = (nmax - 1)*nmax/2 + lmax + 1
-  else
-      size = (lmax + 1)*(lmax + 2)/2 + (nmax - lmax - 2)*(lmax + 1) + &
-          lmax + 1
-  endif
+  ! Total dim of the hilbert space for this problem.
+  size = indicies(nmax,lmax,mmax,nmax,mmax) + 1   
 
   ! These are the default values in atomic units the user is free to change 
   ! them as an extra argument when running the program 
@@ -265,17 +319,18 @@ use hdf5
   call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, operators_local, dims, h5_err)
   call h5dclose_f(operators_dat_id, h5_err)
 
+
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
 ! --------------------------------------------------------------------------
   if ( operators_local .eq. 0) then
     call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
     & trim(operator_directory)//'/'//&
-    & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    & trim(label)//'_Z.bin',FILE_MODE_READ,viewer,ierr)
     CHKERRA(ierr)
   else 
     call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-    & trim(label)//'_dipoleMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    & trim(label)//'_Z.bin',FILE_MODE_READ,viewer,ierr)
     CHKERRA(ierr)
   end if 
 
@@ -298,36 +353,175 @@ use hdf5
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
+
 ! --------------------------------------------------------------------------
-! Create dipole acceleration matrix
+! Create Y_scale matrix
+! --------------------------------------------------------------------------
+
+  if ( mmax .ne. 0) then
+    if ( operators_local .eq. 0) then
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(operator_directory)//'/'//&
+      & trim(label)//'_Y.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    else 
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(label)//'_Y.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    end if 
+
+    call MatCreate(MPI_COMM_WORLD,Y_scale,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(Y_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(Y_scale,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(Y_scale,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(Y_scale,ierr)
+    CHKERRA(ierr)
+    call MatGetOwnershipRange(Y_scale,i_start,i_end,ierr)
+    CHKERRA(ierr)
+    call MatLoad(Y_scale,viewer,ierr)
+    CHKERRA(ierr)
+    call MatScale(Y_scale,(0.d0,-1.d0),ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+  end if
+
+! --------------------------------------------------------------------------
+! Create X_scale matrix
+! --------------------------------------------------------------------------
+
+  if (mmax .ne. 0) then
+    if ( operators_local .eq. 0) then
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(operator_directory)//'/'//&
+      & trim(label)//'_X.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    else 
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(label)//'_X.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    end if 
+
+    call MatCreate(MPI_COMM_WORLD,X_scale,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(X_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(X_scale,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(X_scale,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(X_scale,ierr)
+    CHKERRA(ierr)
+    call MatGetOwnershipRange(X_scale,i_start,i_end,ierr)
+    CHKERRA(ierr)
+    call MatLoad(X_scale,viewer,ierr)
+    CHKERRA(ierr)
+    call MatScale(X_scale,(0.d0,-1.d0),ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+  end if 
+
+! --------------------------------------------------------------------------
+! Create AZ matrix
 ! --------------------------------------------------------------------------
   if ( operators_local .eq. 0) then
     call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
     & trim(operator_directory)//'/'//&
-      trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    & trim(label)//'_AZ.bin',FILE_MODE_READ,viewer,ierr)
     CHKERRA(ierr)
   else 
     call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-      trim(label)//'_dipoleAccelerationMatrix.bin',FILE_MODE_READ,viewer,ierr)
+    & trim(label)//'_AZ.bin',FILE_MODE_READ,viewer,ierr)
     CHKERRA(ierr)
   end if 
-  
-  call MatCreate(MPI_COMM_WORLD,A,ierr)
+
+  call MatCreate(MPI_COMM_WORLD,AZ,ierr)
   CHKERRA(ierr)
-  call MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  call MatSetSizes(AZ,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
   CHKERRA(ierr)
-  call MatSetType(A,mat_type,ierr)
+  call MatSetType(AZ,mat_type,ierr)
   CHKERRA(ierr)
-  call MatSetFromOptions(A,ierr)
+  call MatSetFromOptions(AZ,ierr)
   CHKERRA(ierr)
-  call MatSetUp(A,ierr)
+  call MatSetUp(AZ,ierr)
   CHKERRA(ierr)
-  call MatGetOwnershipRange(A,i_start,i_end,ierr)
+  call MatGetOwnershipRange(AZ,i_start,i_end,ierr)
   CHKERRA(ierr)
-  call MatLoad(A,viewer,ierr)
+  call MatLoad(AZ,viewer,ierr)
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
+
+! --------------------------------------------------------------------------
+! Create AY matrix
+! --------------------------------------------------------------------------
+  if (mmax .ne. 0) then
+    if ( operators_local .eq. 0) then
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(operator_directory)//'/'//&
+      & trim(label)//'_AY.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    else 
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(label)//'_AY.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    end if 
+
+    call MatCreate(MPI_COMM_WORLD,AY,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(AY,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(AY,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(AY,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(AY,ierr)
+    CHKERRA(ierr)
+    call MatGetOwnershipRange(AY,i_start,i_end,ierr)
+    CHKERRA(ierr)
+    call MatLoad(AY,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+  end if 
+
+! --------------------------------------------------------------------------
+! Create AX matrix
+! --------------------------------------------------------------------------
+  if (mmax .ne. 0) then
+    if ( operators_local .eq. 0) then
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(operator_directory)//'/'//&
+      & trim(label)//'_AX.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    else 
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(label)//'_AX.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    end if 
+
+    call MatCreate(MPI_COMM_WORLD,AX,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(AX,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(AX,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(AX,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(AX,ierr)
+    CHKERRA(ierr)
+    call MatGetOwnershipRange(AX,i_start,i_end,ierr)
+    CHKERRA(ierr)
+    call MatLoad(AX,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+  end if 
 
 ! --------------------------------------------------------------------------
 ! Create the H0_scale matrix
@@ -362,6 +556,23 @@ use hdf5
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
+  call h5gopen_f(param_file_id, "laser", laser_group_id, h5_err)
+  
+  call h5dopen_f(laser_group_id, "E_length", laser_dat_id, h5_err)
+  call h5dread_f(laser_dat_id, H5T_NATIVE_INTEGER, max_steps, dims, h5_err)
+  call h5dclose_f( laser_dat_id, h5_err)
+  
+  allocate(E(3,0:max_steps-1))
+  allocate(EE(3,0:max_steps-1))
+  
+  dims2(1) = 3
+  dims2(2) = max_steps
+  call h5dopen_f(laser_group_id, "E", laser_dat_id, h5_err)
+  call h5dread_f(laser_dat_id, H5T_NATIVE_DOUBLE, EE, dims, h5_err)
+  call h5dclose_f( laser_dat_id, h5_err)
+
+  E = dcmplx(EE,0d0)
+
 ! --------------------------------------------------------------------------
 ! Create the Jacobian Matrix
 ! --------------------------------------------------------------------------
@@ -378,8 +589,23 @@ use hdf5
   call MatCopy(H0_scale,J,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   told = 0.d0
-  call MatAXPY(J,(0.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
-  CHKERRA(ierr)
+
+  print*, (maxval(dabs(dble(real(E(3,:))))))
+
+
+!!  if (maxval(dabs(dble(real(E(3,:))))) .ge. 1d-13) then
+    call MatAXPY(J,(0.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+    CHKERRA(ierr)
+!!  end if
+  if (mmax .ne. 0) then
+!!    if (maxval(dabs(dble(real(E(1,:))))) .ge. 1d-13) then
+      call MatAXPY(J,(0.0d0,0.0d0),X_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+!!    end if 
+    
+!!    if (maxval(dabs(dble(real(E(2,:))))) .ge. 1d-13) then
+      call MatAXPY(J,(0.0d0,0.0d0),Y_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+!!    end if 
+  end if
 
 ! --------------------------------------------------------------------------
 ! Propagate
@@ -390,7 +616,7 @@ use hdf5
   ! We want the electron to start in the 1s state so we set psi0(0) = 1
   if (proc_id .eq. 0) then
     do i = 1, num_states 
-      index =  -1 + init_n(i) - (init_l(i)*(1 + init_l(i) - 2*nmax))/2
+      index = indicies(init_n(i),init_l(i),init_m(i),nmax,mmax) 
       call VecSetValue(psi,index,init_amp(i)*zexp(dcmplx(0d0,init_phase(i))),ADD_VALUES,ierr)
       CHKERRA(ierr)
     end do 
@@ -407,28 +633,30 @@ use hdf5
   ! Create the masking vector
   if (masking_function_present .eq. 1) then
     do l = 0,lmax
-      do n=l+1,nmax
-        index =  -1 + n - (l*(1 + l - 2*nmax))/2
-        if (trim(mask) == 'cosine') then
-          ! We want the electron to start in the 1s state so we set psi0(0) = 1
-          if (l>=labs .and. n>=nabs) then 
-            val = (dabs(dcos(((dble(l - labs))/(dble(lmax-labs)))*pi/2d0))**(1d0/mask_pow)*  &
-            & dabs(dcos(((dble(n - nabs)*pi)/(dble(nmax-nabs)))*pi/2d0))**(1d0/mask_pow))**(dt/maxtime)
-          else if (l>=labs) then
-            val = (dabs(dcos(((dble(l -labs))/(dble(lmax-labs)))*pi/2d0))**(1d0/mask_pow))**(dt/maxtime)
-          else if (n>=nabs) then 
-            val = (dabs(dcos(((dble(n - nabs ))/(dble(nmax-nabs)))*pi/2d0))**(1d0/mask_pow))**(dt/maxtime)
+      do m = -min(mmax,l),min(mmax,l)
+        do n=l+1,nmax
+          index = indicies(n,l,m,nmax,mmax)
+          if (trim(mask) == 'cosine') then
+            ! We want the electron to start in the 1s state so we set psi0(0) = 1
+            if (l>=labs .and. n>=nabs) then 
+              val = (dabs(dcos(((dble(l - labs))/(dble(lmax-labs)))*pi/2d0))**(1d0/mask_pow)*  &
+              & dabs(dcos(((dble(n - nabs)*pi)/(dble(nmax-nabs)))*pi/2d0))**(1d0/mask_pow))**(dt/maxtime)
+            else if (l>=labs) then
+              val = (dabs(dcos(((dble(l -labs))/(dble(lmax-labs)))*pi/2d0))**(1d0/mask_pow))**(dt/maxtime)
+            else if (n>=nabs) then 
+              val = (dabs(dcos(((dble(n - nabs ))/(dble(nmax-nabs)))*pi/2d0))**(1d0/mask_pow))**(dt/maxtime)
+            else 
+              val = 1d0
+            end if 
+          else if (trim(mask) == 'raised cosine') then
+            val = (0.5d0*(1d0 + dcos(pi*dble(n)/dble(nmax))))**(dt/maxtime)
           else 
-            val = 1d0
-          end if 
-        else if (trim(mask) == 'raised cosine') then
-          val = (0.5d0*(1d0 + dcos(pi*dble(n)/dble(nmax))))**(dt/maxtime)
-        else 
-          val = 1.d0
-        end if
-        call VecSetValue(mask_vector,index,val,INSERT_VALUES,ierr)
-        CHKERRA(ierr)
-      end do
+            val = 1.d0
+          end if
+          call VecSetValue(mask_vector,index,val,INSERT_VALUES,ierr)
+          CHKERRA(ierr)
+        end do
+      end do 
     end do
     call VecAssemblyBegin(mask_vector,ierr) 
     CHKERRA(ierr)
@@ -455,22 +683,6 @@ use hdf5
   ! Now we will provide the Jacobian matrix
   call TSSetRHSJacobian(ts,J,J,RHSMatrixSchrodinger,0,ierr)
   CHKERRA(ierr)
-
-  call h5gopen_f(param_file_id, "laser", laser_group_id, h5_err)
-  
-  call h5dopen_f(laser_group_id, "E_length", laser_dat_id, h5_err)
-  call h5dread_f(laser_dat_id, H5T_NATIVE_INTEGER, max_steps, dims, h5_err)
-  call h5dclose_f( laser_dat_id, h5_err)
-  
-  allocate(E(0:max_steps-1))
-  allocate(EE(0:max_steps-1))
-  
-  dims(1) = max_steps
-  call h5dopen_f(laser_group_id, "E", laser_dat_id, h5_err)
-  call h5dread_f(laser_dat_id, H5T_NATIVE_DOUBLE, EE, dims, h5_err)
-  call h5dclose_f( laser_dat_id, h5_err)
-
-  E = dcmplx(EE,0d0)
 
   ! I'll set the initial time to be t = 0
   call TSSetTime(ts,0d0,ierr)
@@ -517,10 +729,24 @@ use hdf5
   call TSSetSNES(ts,snes,ierr)
   CHKERRA(ierr)
 
-  call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,max_steps,dipoleA,ierr)
+
+
+  call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,max_steps,dipoleAZ,ierr)
   CHKERRA(ierr)
-  call VecSet(dipoleA,(0d0,0d0),ierr)
+  call VecSet(dipoleAZ,(0d0,0d0),ierr)
   CHKERRA(ierr)
+
+  if ( mmax .ne. 0 ) then
+    call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,max_steps,dipoleAX,ierr)
+    CHKERRA(ierr)
+    call VecSet(dipoleAX,(0d0,0d0),ierr)
+    CHKERRA(ierr)
+    call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,max_steps,dipoleAY,ierr)
+    CHKERRA(ierr)
+    call VecSet(dipoleAY,(0d0,0d0),ierr)
+    CHKERRA(ierr)
+  end if
+
   ! Now we finally solve the system 
   call TSSolve(ts,psi,ierr)
   CHKERRA(ierr)
@@ -538,19 +764,49 @@ use hdf5
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
-  call VecAssemblyBegin(dipoleA,ierr)
+  call VecAssemblyBegin(dipoleAZ,ierr)
   CHKERRA(ierr)
-  call VecAssemblyEnd(dipoleA,ierr)
+  call VecAssemblyEnd(dipoleAZ,ierr)
   CHKERRA(ierr)
-  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAcceleration.output',&
+  if ( mmax .ne. 0 ) then
+    call VecAssemblyBegin(dipoleAX,ierr)
+    CHKERRA(ierr)
+    call VecAssemblyEnd(dipoleAX,ierr)
+    CHKERRA(ierr)
+    call VecAssemblyBegin(dipoleAY,ierr)
+    CHKERRA(ierr)
+    call VecAssemblyEnd(dipoleAY,ierr)
+    CHKERRA(ierr)
+  end if
+  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationZ.output',&
   & viewer,ierr)
   CHKERRA(ierr)
   call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
   CHKERRA(ierr)
-  call VecView(dipoleA,viewer,ierr)
+  call VecView(dipoleAZ,viewer,ierr)
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
+  if ( mmax .ne. 0 ) then
+    call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationX.output',&
+    & viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+    CHKERRA(ierr)
+    call VecView(dipoleAX,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationY.output',&
+    & viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+    CHKERRA(ierr)
+    call VecView(dipoleAY,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+  end if
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
   & viewer,ierr)
   CHKERRA(ierr)
@@ -561,9 +817,12 @@ use hdf5
   call VecSum(psi,norm,ierr)
   CHKERRA(ierr)
 
-  write(tmp_character, "(ES9.2)")  real(real(norm))
+  write(tmp_character, "(ES9.2)")  dble(real(norm))
   call PetscPrintf(MPI_COMM_WORLD, 'Norm ='//trim(tmp_character)//"\n", ierr)
   CHKERRA(ierr)
+  if (proc_id .eq. 0) then
+    print*, 1.0 - dble(real(norm))
+  end if 
   
 ! --------------------------------------------------------------------------
 ! Clear memory
@@ -572,6 +831,7 @@ use hdf5
   deallocate(EE)
   deallocate(init_n)
   deallocate(init_l)
+  deallocate(init_m)
   deallocate(init_amp)
   deallocate(init_phase)
 
@@ -585,16 +845,30 @@ use hdf5
   CHKERRA(ierr)
   call MatDestroy(H0_scale,ierr)
   CHKERRA(ierr)
+
+
   call MatDestroy(Z_scale,ierr)
   CHKERRA(ierr)
-  call MatDestroy(A,ierr)
+  call MatDestroy(AZ,ierr)
   CHKERRA(ierr)
+  if ( mmax .ne. 0 ) then
+    call MatDestroy(AX,ierr)
+    CHKERRA(ierr)
+    call MatDestroy(AY,ierr)
+    CHKERRA(ierr)
+  end if
   call VecDestroy(psi,ierr)
   CHKERRA(ierr)
   call VecDestroy(tmp,ierr)
   CHKERRA(ierr)
-  call VecDestroy(dipoleA,ierr)
+  call VecDestroy(dipoleAZ,ierr)
   CHKERRA(ierr)
+  if ( mmax .ne. 0 ) then
+    call VecDestroy(dipoleAX,ierr)
+    CHKERRA(ierr)
+    call VecDestroy(dipoleAY,ierr)
+    CHKERRA(ierr)
+  end if
   call CPU_TIME(end_time)
   write(tmp_character, "(ES9.2)")  end_time-start_time
   call PetscPrintf(MPI_COMM_WORLD, 'time   :'//trim(tmp_character)//"\n", ierr)

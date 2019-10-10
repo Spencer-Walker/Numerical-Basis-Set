@@ -1,8 +1,98 @@
 ! This program generates the dipole acceleration operator 
+function Indicies(n,l,m,nmax,mmax) 
+  implicit none
+  integer, intent(in)  :: n,l,m,nmax,mmax
+  integer :: Indicies
+  integer :: first, rest
+  if (l .le. mmax + 1) then
+    first = (2*nmax-1)*l*(l-1)/2+ nmax*l - 2*(l-1)*l*(2*l-1)/6
+  else 
+    first = (2*nmax-1)*mmax*(mmax+1)/2+ nmax*(mmax+1) - 2*mmax*(mmax+1)*(2*mmax+1)/6
+    first = first + (2*mmax+1)*( nmax*(l-1-mmax) - l*(l-1)/2 + mmax*(mmax + 1)/2)
+  end if
+  rest =  (m + min(l,mmax))*(nmax-l) + n - l - 1;
+  Indicies = first + rest
+  return
+end function Indicies
+
+function Transfer_Coeff(m1,m2)
+#include <slepc/finclude/slepceps.h>
+  use slepceps
+  implicit none
+  integer, intent(in) :: m1, m2
+  PetscScalar :: Transfer_Coeff
+  if (abs(m1) .ne. abs(m2)) then
+    Transfer_Coeff = 0d0 
+    return
+  else if ( m1 .eq. 0 .and. m2 .eq. 0 ) then 
+    Transfer_Coeff = 1d0
+    return
+  else if ( m1 .gt. 0 .and. m2 .gt. 0 ) then
+    Transfer_Coeff = (-1d0)**dble(m1)/dsqrt(2.d0) 
+    return
+  else if ( m1 .gt. 0 .and. m2 .lt. 0 ) then
+    Transfer_Coeff = 1.d0/dsqrt(2.d0)
+    return
+  else if ( m1 .lt. 0 .and. m2 .gt. 0 ) then
+    Transfer_Coeff = dcmplx(0d0,-1d0)*(-1d0)**dble(m1)/dsqrt(2d0)
+    return
+  else if ( m1 .lt. 0 .and. m2 .lt. 0 ) then
+    Transfer_Coeff = dcmplx(0d0,1d0)/dsqrt(2d0)
+    return 
+  end if
+end function Transfer_Coeff
+
+function ThreeJ(l1,l2,l3,m1,m2,m3)
+  use fgsl
+  use iso_c_binding
+  implicit none 
+  integer, intent(in) :: l1, l2, l3, m1, m2, m3
+  real(fgsl_double) :: ThreeJ 
+  ThreeJ = fgsl_sf_coupling_3j(2*l1,2*l2,2*l3,2*m1,2*m2,2*m3)
+  return 
+end function ThreeJ
+
+function Angular(l1,k,l2,m1,q,m2)
+#include <slepc/finclude/slepceps.h>
+  use fgsl
+  use iso_c_binding
+  use slepceps
+  implicit none
+  real(fgsl_double)   :: ThreeJ
+  PetscScalar :: Transfer_Coeff, Angular
+  integer, intent(in) :: l1,m1,k,q,l2,m2
+  integer :: mm, qq
+  Angular = 0d0 
+
+  if ( m1 .eq. 0 .and. q .eq. 0 ) then
+    Angular = Angular + ThreeJ(l1,k,l2,-m1,0,m2)
+  elseif ( m1 .eq. 0 ) then
+    do qq = -abs(q),abs(q), 2*abs(q)
+      Angular = Angular + Transfer_Coeff(m2,-qq)*Transfer_Coeff(q,qq)*ThreeJ(l1,k,l2,0,qq,-qq)
+    enddo
+  elseif ( q .eq. 0) then
+    do mm = -abs(m1),abs(m1), 2*abs(m1)
+      Angular = Angular + dconjg(Transfer_Coeff(m1,mm))*Transfer_Coeff(m2,mm)*(-1d0)**dble(mm)*ThreeJ(l1,k,l2,-mm,0,mm)
+    enddo
+  else
+    do mm = -abs(m1),abs(m1), 2*abs(m1)
+      do qq = -abs(q),abs(q), 2*abs(q)
+        Angular = Angular + dconjg(Transfer_Coeff(m1,mm))*Transfer_Coeff(m2,mm-qq)*Transfer_Coeff(q,qq)*(-1d0)**dble(mm)*ThreeJ(l1,k,l2,-mm,qq,mm-qq)
+      enddo
+    enddo
+  end if
+
+  Angular =  dsqrt(dble((2*l1+1)*(2*l2+1)))*ThreeJ(l1,k,l2,0,0,0)*Angular
+  
+  return
+end function Angular 
+
 program main
 #include <slepc/finclude/slepceps.h>
 use slepceps
 use hdf5
+use fgsl
+use iso_c_binding
 #if defined(__INTEL_COMPILER)
 use ifport
 #endif
@@ -12,22 +102,24 @@ implicit none
 ! --------------------------------------------------------------------------
   PetscInt,   parameter :: dp = kind(1.d0)
   PetscErrorCode      :: ierr
-  Mat                 :: Z
+  Mat                 :: X, Y, Z
   PetscReal           :: h,Rmax
   PetscViewer         :: viewer
   PetscMPIInt         :: proc_id, num_proc, comm 
-  PetscScalar         :: rint
+  PetscScalar, allocatable  :: rint_left(:,:),rint(:,:)
   PetscInt            :: i_start, i_end, left_index, right_index, index
-  PetscInt            :: l_i_start, l_i_end, n, l, i
-  PetscInt            :: itter, n1, n2, nmax, l1, l2, lmax, size
-  PetscInt            :: num_points, h5_err, tdse_nmax, tdse_lmax
+  PetscInt            :: l_i_start, l_i_end, m_i_start, m_i_end, n, l, m, m1, m2, i
+  PetscInt            :: m1_low, m1_high
+  PetscInt            :: itter_x,itter_y,itter_z, n1, n2, nmax, l1, l2, lmax, size
+  PetscInt            :: num_points, h5_err, tdse_nmax, tdse_lmax, tdse_mmax
   PetscInt            :: status, basis_local
   PetscReal           :: start_time, end_time
-  PetscReal,      allocatable :: r(:), y(:,:,:)
-  PetscScalar,    allocatable :: val_right(:), val_left(:), v1(:), v2(:)
-  PetscScalar,    allocatable :: u_right(:,:,:), u_left(:,:,:)
-  PetscInt,       allocatable :: col(:)
-  PetscReal,      allocatable :: clebsch_gordan(:)
+  PetscReal,      allocatable :: r(:), wfn(:,:,:)
+  PetscScalar,    allocatable :: val_z(:), v1(:), v2(:)
+  PetscScalar,    allocatable :: val_x(:)
+  PetscScalar,    allocatable :: val_y(:)
+  PetscScalar,    allocatable :: u(:,:,:)
+  PetscInt,       allocatable :: col_x(:),col_y(:),col_z(:)
   logical             :: skip
   integer(HID_T)      :: psi_id, h5_kind
   integer(HSIZE_T)    :: psi_dims(1:3), dims(1)
@@ -37,6 +129,7 @@ implicit none
   integer(HID_T)      :: install_dat_id
   integer(HID_T)      :: operators_group_id, operators_dat_id
   integer(HID_T)      :: tdse_group_id, tdse_dat_id
+  real(fgsl_double)   :: threej_m0, ThreeJ
   character(len = 15) :: label ! File name without .h5 extension
   character(len = 3)  :: strl! file number
   character(len = 12) :: psi_name
@@ -48,7 +141,10 @@ implicit none
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
   PetscInt,   allocatable  :: block_n(:), block_l(:)
   integer(HID_T)      :: block_group_id, block_dat_id
-  PetscInt            :: num_block, observables_only
+  PetscInt            :: num_block
+  integer :: Indicies, nnzx, nnzy, nnzz
+  PetscScalar :: Angular, blah
+  complex(16) :: blah2
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
@@ -70,7 +166,7 @@ implicit none
   end if
 
   comm  = MPI_COMM_WORLD
-
+  
   call h5fopen_f( trim("parameters.h5"), H5F_ACC_RDONLY_F, param_file_id, h5_err)
 
   dims(1) = 1
@@ -117,6 +213,10 @@ implicit none
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_lmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
+  call h5dopen_f(tdse_group_id, "m_max", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_mmax, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
   call h5dopen_f(tdse_group_id, "n_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_nmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
@@ -136,12 +236,8 @@ implicit none
   end if 
 
   call h5gopen_f(param_file_id, "block_state", block_group_id, h5_err)
+
   dims(1) = 1
-  call h5dopen_f(block_group_id, "observables_only", block_dat_id, h5_err)
-  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, observables_only, dims, h5_err)
-  call h5dclose_f(block_dat_id, h5_err)
-
-
   call h5dopen_f(block_group_id, "num_block", block_dat_id, h5_err)
   call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, num_block, dims, h5_err)
   call h5dclose_f(block_dat_id, h5_err)
@@ -177,23 +273,18 @@ implicit none
   ! Converts fortrans double kind to an hdf5 double type 
   h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
 
-  ! If we truncate the basis (set nmax > lmax + 1) then we set the size of
-  ! Z differently  
-  if(tdse_nmax .le. tdse_lmax+1) then 
-    size = (tdse_nmax - 1)*tdse_nmax/2 + tdse_lmax+ 1
-  else
-      size = (tdse_lmax + 1)*(tdse_lmax + 2)/2 + (tdse_nmax - tdse_lmax - 2)*(tdse_lmax + 1) + &
-        tdse_lmax + 1
-  endif
-
-  allocate(clebsch_gordan(tdse_lmax))
-  allocate(col(tdse_nmax))
-  allocate(val_right(tdse_nmax))
-  allocate(val_left(tdse_nmax))
-
+  ! Total dim of the hilbert space for this problem.
+  size = Indicies(tdse_nmax,tdse_lmax,tdse_mmax,tdse_nmax,tdse_mmax) + 1 
+  
+  allocate(col_x(tdse_nmax))
+  allocate(col_y(tdse_nmax))
+  allocate(col_z(tdse_nmax))
+  allocate(val_z(tdse_nmax))
+  allocate(val_x(tdse_nmax))
+  allocate(val_y(tdse_nmax))
 
 ! --------------------------------------------------------------------------
-! Create Z matrix
+! Create Z, X, Y matrix
 ! --------------------------------------------------------------------------
   call MatCreate(PETSC_COMM_WORLD,Z,ierr)
   CHKERRA(ierr)
@@ -201,6 +292,13 @@ implicit none
   CHKERRA(ierr)
   call MatSetType(Z,mat_type,ierr)
   CHKERRA(ierr)
+  if (tdse_mmax .eq. 0) then
+    call MatMPISBAIJSetPreallocation(Z,1,tdse_nmax+1,PETSC_NULL_INTEGER,tdse_nmax,PETSC_NULL_INTEGER,ierr)
+    CHKERRA(ierr)
+  else 
+    call MatMPISBAIJSetPreallocation(Z,1,3*tdse_nmax+1,PETSC_NULL_INTEGER,3*tdse_nmax,PETSC_NULL_INTEGER,ierr)
+    CHKERRA(ierr)
+  end if 
   call MatSetFromOptions(Z,ierr)
   CHKERRA(ierr)
   call MatSetUp(Z,ierr)
@@ -208,28 +306,64 @@ implicit none
   call MatGetOwnershipRange(Z,i_start,i_end,ierr)
   CHKERRA(ierr)
 
+  if (tdse_mmax .ne. 0) then
+    call MatCreate(PETSC_COMM_WORLD,X,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(X,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(X,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatMPISBAIJSetPreallocation(X,1,3*tdse_nmax+1,PETSC_NULL_INTEGER,3*tdse_nmax,PETSC_NULL_INTEGER,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(X,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(X,ierr)
+    CHKERRA(ierr)
+
+    call MatCreate(PETSC_COMM_WORLD,Y,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(Y,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(Y,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatMPISBAIJSetPreallocation(Y,1,3*tdse_nmax+1,PETSC_NULL_INTEGER,3*tdse_nmax,PETSC_NULL_INTEGER,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(Y,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(Y,ierr)
+    CHKERRA(ierr)
+  end if 
+  
   l_i_start = -1
   l_i_end = -1
   do l = 0,tdse_lmax-1
-    do n=l+1,tdse_nmax
-      index = -1 + n - (l*(1 + l - 2*tdse_nmax))/2
-      if (index>=i_start .and. l_i_start == -1) then
-        l_i_start = l
-      end if
-      if (index<i_end) then
-        l_i_end = l
-      end if 
+    do m = -min(tdse_mmax,l),min(tdse_mmax,l)
+      do n=l+1,tdse_nmax
+        index = Indicies(n,l,m,tdse_nmax,tdse_mmax)
+        if (index>=i_start .and. l_i_start == -1) then
+          l_i_start = l
+          m_i_start = m
+        end if
+        if (index<=i_end) then
+          l_i_end = l
+          m_i_end = m
+        end if 
+      end do
     end do
-  end do
+  end do 
 
-  allocate(u_right(num_points,nmax,l_i_start:l_i_end+1))
-  allocate(u_left(num_points,nmax,l_i_start:l_i_end+1))
+  if (l_i_start .eq. -1) then
+    l_i_start = tdse_lmax - 1
+    m_i_start = -min(tdse_mmax,tdse_lmax-1)
+  end if 
+
+  allocate(u(num_points,nmax,l_i_start:l_i_end+1))
   allocate(v1(num_points))
   allocate(v2(num_points))
   allocate(r(num_points))
 
   do l = l_i_start,l_i_end+1
-    allocate(y(1:num_points,1:nmax-l,2))
+    allocate(wfn(1:num_points,1:nmax-l,2))
     if     (l .le. 9 ) then
       fmt = '(I1.1)'
     elseif (l .le. 99) then
@@ -241,172 +375,197 @@ implicit none
     write(strl,fmt) l
 
     Psi_name = 'Psi_r_l'//trim(strl)
-
     call h5dopen_f(file_id, psi_name, psi_id, h5_err)
 
     psi_dims(1) = int(Rmax/h)
     psi_dims(2) = nmax-l
     psi_dims(3) = 2
 
-    call h5dread_f( psi_id, h5_kind, y(1:num_points,1:nmax-l,:),  &
+    call h5dread_f( psi_id, h5_kind, wfn(1:num_points,1:nmax-l,:),  &
     & psi_dims, h5_err)
     
-    u_right(1:num_points,1:nmax-l,l) = dcmplx(y(1:num_points,1:nmax-l,1),y(1:num_points,1:nmax-l,2))
+    u(1:num_points,1:nmax-l,l) = dcmplx(wfn(1:num_points,1:nmax-l,1),wfn(1:num_points,1:nmax-l,2))
     call h5dclose_f( psi_id, h5_err)
-    deallocate(y)
+    deallocate(wfn)
   end do
-
-  do l = l_i_start,l_i_end+1
-    allocate(y(1:num_points,1:nmax-l,2))
-    if     (l .le. 9 ) then
-      fmt = '(I1.1)'
-    elseif (l .le. 99) then
-      fmt = '(I2.2)'
-    else
-      fmt = '(I3.3)'
-    endif
-
-    write(strl,fmt) l
-
-    Psi_name = 'Psi_l_l'//trim(strl)
-
-    call h5dopen_f(file_id, psi_name, psi_id, h5_err)
-
-    psi_dims(1) = int(Rmax/h)
-    psi_dims(2) = nmax-l
-    psi_dims(3) = 2
-
-    call h5dread_f( psi_id, h5_kind, y(1:num_points,1:nmax-l,:),  &
-    & psi_dims, h5_err)
-    
-    u_left(1:num_points,1:nmax-l,l) = dcmplx(y(1:num_points,1:nmax-l,1),y(1:num_points,1:nmax-l,2))
-    call h5dclose_f( psi_id, h5_err)
-    deallocate(y)
-  end do
-
-  
+ 
 ! --------------------------------------------------------------------------
 ! Create r Vector
 ! --------------------------------------------------------------------------
   r(:) = (/(i*h,i = 1,num_points)/)
 ! --------------------------------------------------------------------------
-! Load in Clebsch Gordan Coefficients from .bin File
-! --------------------------------------------------------------------------
-  status = chdir(trim(install_directory))
-  open(5, file='clebsch_gordan.bin', form='unformatted',access='stream')
-  
-  do itter = 1,tdse_lmax
-      read(5, pos=8*itter - 7) clebsch_gordan(itter)
-  enddo
-  close(5)
-  status = chdir(trim(basis_directory))
   ! Itterate over angular momentum to calculate half the matrix elements
-  L_LP_LOOP: do l = l_i_start,l_i_end
-    ! For linearly polarized pulses the only non-zero matrix elements are 
-    ! for l+/-1
-    ! we will compute the (l,l+1) elements only and take care of the rest 
-    ! using the fact that Z is hermetian. 
-    write(tmp_character, "(A2,I4)")  'l1', l
-    call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
-    CHKERRA(ierr)
+  !open(1, file = 'data1.dat', status = 'new')
+  nnzx = 0
+  nnzy = 0
+  nnzz = 0
+
+  L_LOOP: do l = l_i_start,l_i_end
     l1 = l
-    l2 = l + 1
-    ! For each l value we compute the corresponding matrix elements of Z
-    do n1=l1+1,tdse_nmax
-      ! Here I convert the n1 and l1 value to its corresponding index
-      left_index = -1 + n1 - (l1*(1 + l1 - 2*tdse_nmax))/2
-      if (left_index < i_end .and. left_index >= i_start) then 
-        ! Here I convert the n2 and l2 value to its corresponding index
-        itter = 1
-        skip = .false.
-        do n2=l2+1,tdse_nmax
-          if ( (num_block .ne. 0 ) .and. observables_only .eq. 0) then
-            do i = 1,num_block
-              if ( (block_n(i) .eq. n1) .and. block_l(i) .eq. l1) then
-                skip = .true.
-              end if
-              if ( (block_n(i) .eq. n2) .and. block_l(i) .eq. l2) then
-                skip = .true.
-              end if
-            end do 
-          end if 
-          if (.not. skip) then
-            right_index = -1 + n2 - (l2*(1 + l2 - 2*tdse_nmax))/2
-            ! I create a vector of indicies corresponding to what columns I 
-            ! am setting for each row
-            col(itter) = right_index
+    l2 = l+1
+    
+    threej_m0 = ThreeJ(l1,1,l2,0,0,0)
+    
+    LOW_CONDITION: if (l1 .eq. l_i_start) then
+      m1_low  = m_i_start
+    else
+      m1_low = -min(tdse_mmax,l1)
+    end if LOW_CONDITION
 
-            ! Here I compute matrix elements of the r operator as a weighted 
-            ! inner product
-            v1 = u_left(:,n1-l1,l1)
-            v2 = u_right(:,n2-l2,l2)
-            rint = sum(v1*r*v2)
+    HIGH_CONDITION: if (l1 .eq. l_i_end) then 
+      m1_high = m_i_end 
+    else 
+      m1_high = min(tdse_mmax,l1)
+    end if HIGH_CONDITION
+    
+    allocate(rint(tdse_nmax-l1,tdse_nmax-l2))
+    allocate(rint_left(tdse_nmax-l2,tdse_nmax-l1))
 
-            ! Here I compute matrix elements corresponding to the indicies in 
-            ! the col vector
-            val_right(itter) = 2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint
-            if (mat_type .ne. MATSBAIJ) then
-              v1 = u_left(:,n2-l2,l2)
-              v2 = u_right(:,n1-l1,l1)
-              rint = sum(v1*r*v2)
+    N1_INT_LOOP: do n1 = l1+1, tdse_nmax
+      N2_INT_LOOP: do n2 = l2+1, tdse_nmax
+        v1 = u(:,n1-l1,l1)
+        v2 = u(:,n2-l2,l2)
+        rint(n1-l1,n2-l2) = sum(v1*r*v2)
 
-              val_left(itter) = 2.d0*((pi/3.d0)**0.5d0)*clebsch_gordan(l1+1)*rint
+      end do N2_INT_LOOP
+    end do N1_INT_LOOP
+
+    M1_LOOP: do m1 = m1_low,m1_high
+      write(tmp_character, "(A2,I4,A4,I4)")  'l1', l1, ', m1', m1
+      call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
+      CHKERRA(ierr)
+      N1_LOOP: do n1 = l1+1,tdse_nmax
+        left_index = Indicies(n1,l1,m1,tdse_nmax,tdse_mmax)
+        RANGE_CONDITION: if (left_index < i_end .and. left_index >= i_start) then
+          M2_LOOP: do m2 = -max(tdse_mmax,l2),min(tdse_mmax,l2)
+            itter_x = 1
+            itter_y = 1
+            itter_z = 1
+            N2_LOOP: do n2 = l2+1,tdse_nmax
+              skip = .false.  
+              BLOCK_CONDITION: if ( num_block .ne. 0 )  then
+                BLOCK_LOOP: do i = 1,num_block
+                  ROW_CONDITION: if ( (block_n(i) .eq. n1) .and. block_l(i) .eq. l1) then
+                    skip = .true.
+                  end if ROW_CONDITION
+                  COLUMN_CONDITION: if ( (block_n(i) .eq. n2) .and. block_l(i) .eq. l2) then
+                    skip = .true.
+                  end if COLUMN_CONDITION
+                end do BLOCK_LOOP                
+              end if BLOCK_CONDITION
+              SKIP_CONDITION: if (skip .eqv. .false.) then
+                right_index = Indicies(n2,l2,m2,tdse_nmax,tdse_mmax)
+                col_x(itter_x) = right_index
+                col_y(itter_y) = right_index
+                col_z(itter_z) = right_index
+                val_z(itter_z) = Angular(l1,1,l2,m1,0,m2)*rint(n1-l1,n2-l2)
+                
+                if (zabs(val_z(itter_z)) .gt. 1d-16) then 
+                  itter_z = itter_z + 1
+                  nnzz = nnzz + 1
+                endif
+
+                if (tdse_mmax .ne. 0) then 
+                  val_x(itter_x) = Angular(l1,1,l2,m1,1,m2)*rint(n1-l1,n2-l2)
+                  if (zabs(val_x(itter_x)) .gt. 1d-16 ) then 
+                    itter_x = itter_x + 1
+                    nnzx = nnzx + 1
+                  endif
+                  val_y(itter_y) =Angular(l1,1,l2,m1,-1,m2)*rint(n1-l1,n2-l2)
+                  if (zabs(val_y(itter_y)) .gt. 1d-16 ) then 
+                    itter_y = itter_y + 1
+                    nnzy = nnzy + 1
+                  endif
+                end if 
+                !write(1,*) l,m1,m2,dble(real( Angular(l1,1,l2,m1,0,m2))),dble(real( Angular(l1,1,l2,m1,1,m2))),dble(real( Angular(l1,1,l2,m1,-1,m2)))
+              end if SKIP_CONDITION
+            end do N2_LOOP
+            call MatSetValues(Z,1,left_index,itter_z-1,col_z,val_z,INSERT_VALUES,ierr)
+            CHKERRA(ierr)
+
+            if (tdse_mmax .ne. 0) then 
+              call MatSetValues(X,1,left_index,itter_x-1,col_x,val_x,INSERT_VALUES,ierr)
+              CHKERRA(ierr)
+
+              call MatSetValues(Y,1,left_index,itter_y-1,col_y,val_y,INSERT_VALUES,ierr)
+              CHKERRA(ierr)
             end if 
+          end do M2_LOOP
+        else if (left_index >= i_end) then
+          deallocate(rint_left,rint)
+          exit L_LOOP
+        end if RANGE_CONDITION
+      end do N1_LOOP
+    end do M1_LOOP
+    deallocate(rint_left,rint)
+  end do L_LOOP
 
-            itter = itter + 1
-          end if 
-          skip = .false.
-        end do
-
-        ! Now that all matrix elements have been computed for the n1 state for
-        ! all n2 states I need to 
-        ! start again with the first n2 state and compute inner products with 
-        ! the nex n1 state
-        
-        call MatSetValues(Z,1,left_index,itter-1,col,val_right,INSERT_VALUES,ierr)
-        CHKERRA(ierr)
-        if (mat_type .ne. MATSBAIJ) then
-          call MatSetValues(Z,itter-1,col,1,left_index,val_left,INSERT_VALUES,ierr)
-          CHKERRA(ierr)
-        end if
-
-      else if (left_index >= i_end) then
-        exit L_LP_LOOP
-      end if 
-    end do
-
-    ! Here I destroy the petsc viewers since we are going to move onto the 
-    ! next l values
-  end do L_LP_LOOP
+  print*, nnzx,nnzy,nnzz
 
   status = chdir(trim(working_directory))
-  ! We finish building Z now that we've finished adding elements
+
   call MatAssemblyBegin(Z,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)
   call MatAssemblyEnd(Z,MAT_FINAL_ASSEMBLY,ierr)
   CHKERRA(ierr)
 
-  ! We now save the complete Z matrix to a binary file on the disk
-  call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-    & trim(label)//"_dipoleMatrix.bin",FILE_MODE_WRITE,viewer,ierr);&
+
+
+  if (tdse_mmax .ne. 0) then
+    call MatAssemblyBegin(X,MAT_FINAL_ASSEMBLY,ierr)
+    CHKERRA(ierr)
+    call MatAssemblyEnd(X,MAT_FINAL_ASSEMBLY,ierr)
     CHKERRA(ierr)
 
-    
+    call MatAssemblyBegin(Y,MAT_FINAL_ASSEMBLY,ierr)
+    CHKERRA(ierr)
+    call MatAssemblyEnd(Y,MAT_FINAL_ASSEMBLY,ierr)
+    CHKERRA(ierr)
+  end if 
+
+
+  call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+  trim(label)//"_Z.bin",FILE_MODE_WRITE,viewer,ierr)
+  CHKERRA(ierr)
   call MatView(Z,viewer,ierr)
   CHKERRA(ierr)
-
-  ! Now that Z is saved to memory we clear out memory and exit
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
   call MatDestroy(Z,ierr)
   CHKERRA(ierr)
+
+  if (tdse_mmax .ne. 0) then
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    trim(label)//"_X.bin",FILE_MODE_WRITE,viewer,ierr)
+    CHKERRA(ierr)
+    call MatView(X,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+    call MatDestroy(X,ierr)
+    CHKERRA(ierr)
+
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    trim(label)//"_Y.bin",FILE_MODE_WRITE,viewer,ierr)
+    CHKERRA(ierr)
+    call MatView(Y,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+    call MatDestroy(Y,ierr)
+    CHKERRA(ierr)
+  end if 
+
   
-  deallocate(val_right)
-  deallocate(val_left)
-  deallocate(col)
-  deallocate(clebsch_gordan)
+  deallocate(val_z)
+  deallocate(val_x)
+  deallocate(val_y)
+  deallocate(col_x)
+  deallocate(col_y)
+  deallocate(col_z)
   deallocate(v1)
   deallocate(v2)
-  deallocate(u_right)
-  deallocate(u_left)
+  deallocate(u)
   deallocate(r)
   deallocate(block_l)
   deallocate(block_n)
@@ -423,5 +582,6 @@ implicit none
   call PetscPrintf(MPI_COMM_WORLD, 'time   :'//trim(tmp_character)//"\n", ierr)
   CHKERRA(ierr)
   call SlepcFinalize(ierr)
+
 
 end program main

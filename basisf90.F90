@@ -4,6 +4,8 @@ program main
 use slepceps
 use hdf5
 use mpi
+use fgsl
+use iso_c_binding
   implicit none
   PetscInt,   parameter :: dp = kind(1.d0)
   PetscInt  :: nmax, INFO

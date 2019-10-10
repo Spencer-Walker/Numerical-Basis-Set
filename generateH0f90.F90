@@ -1,14 +1,32 @@
 ! This program generates the field free hamiltonion in energy basis
+function indicies(n,l,m,nmax,mmax) 
+  implicit none
+  integer, intent(in)  :: n,l,m,nmax,mmax
+  integer :: indicies
+  integer :: first, rest
+  if (l .le. mmax + 1) then
+    first = (2*nmax-1)*l*(l-1)/2+ nmax*l - 2*(l-1)*l*(2*l-1)/6
+  else 
+    first = (2*nmax-1)*mmax*(mmax+1)/2+ nmax*(mmax+1) - 2*mmax*(mmax+1)*(2*mmax+1)/6
+    first = first + (2*mmax+1)*( nmax*(l-1-mmax) - l*(l-1)/2 + mmax*(mmax + 1)/2)
+  end if
+  rest =  (m + min(l,mmax))*(nmax-l) + n - l - 1;
+
+  indicies = first + rest
+end function indicies
+
+
 program main
 #include <slepc/finclude/slepceps.h>
 #include <petsc/finclude/petscdm.h>
 #include <petsc/finclude/petscdmda.h>
 use hdf5
 use slepceps
+use fgsl
+use iso_c_binding
 #if defined(__INTEL_COMPILER)
 use ifport
 #endif
-
   implicit none
 ! --------------------------------------------------------------------------
 ! Declarations
@@ -17,10 +35,11 @@ use ifport
   PetscErrorCode      :: ierr
   Mat                 :: H0
   PetscInt            :: i_start, i_end, index, l_i_end, l_i_start
+  PetscInt            :: m_i_start, m_i_end
   PetscViewer         :: viewer
   PetscMPIInt         :: proc_id, num_proc, comm 
   PetscInt            :: l, n, nmax, lmax, size, left_index, h5_err
-  PetscInt            :: tdse_nmax, tdse_lmax, i, basis_local, status
+  PetscInt            :: tdse_nmax, tdse_lmax, tdse_mmax, m, i, basis_local, status
   PetscScalar, allocatable :: val(:)
   PetscInt,    allocatable :: col(:)
   PetscReal, allocatable   :: El(:,:)
@@ -43,9 +62,11 @@ use ifport
   PetscInt,   allocatable  :: block_n(:), block_l(:)
   integer(HID_T)      :: block_group_id, block_dat_id
   PetscInt            :: num_block, observables_only
+  integer :: indicies
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
+
   call CPU_TIME(start_time)
 
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
@@ -96,6 +117,10 @@ use ifport
 
   call h5dopen_f(tdse_group_id, "l_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_lmax, dims, h5_err)
+  call h5dclose_f( tdse_dat_id, h5_err)
+
+  call h5dopen_f(tdse_group_id, "m_max", tdse_dat_id, h5_err)
+  call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_mmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
   call h5dopen_f(tdse_group_id, "n_max", tdse_dat_id, h5_err)
@@ -149,14 +174,8 @@ use ifport
   allocate(E(nmax,0:tdse_lmax))
   allocate(El(nmax,2))
   
-  ! If nmax <= lmax+1 then we use the normal rule but if its larger we 
-  ! need to truncate our basis
-  if(tdse_nmax .le. tdse_lmax+1) then
-    size = (tdse_nmax - 1)*tdse_nmax/2 + tdse_lmax + 1
-  else
-    size = (tdse_lmax + 1)*(tdse_lmax + 2)/2 + (tdse_nmax - tdse_lmax - 2)*(tdse_lmax + 1) +&
-    tdse_lmax + 1
-  endif 
+  ! Total dim of the hilbert space for this problem.
+  size = indicies(tdse_nmax,tdse_lmax,tdse_mmax,tdse_nmax,tdse_mmax) + 1 
 
   status = getcwd(working_directory)
   status = chdir(trim(basis_directory))
@@ -189,79 +208,88 @@ use ifport
 
   l_i_start = -1
   l_i_end = -1
+  m_i_start = -1
+  m_i_end = -1
   do l = 0,tdse_lmax
-    do n=l+1,tdse_nmax
-      index = -1 + n - (l*(1 + l - 2*tdse_nmax))/2
-      if (index>=i_start .and. l_i_start == -1) then
-        l_i_start = l
-      end if
-      if (index<=i_end) then
-        l_i_end = l
-      end if 
+    do m = -min(tdse_mmax,l),min(tdse_mmax,l)
+      do n=l+1,tdse_nmax
+        index = indicies(n,l,m,tdse_nmax,tdse_mmax)
+        if (index>=i_start .and. l_i_start == -1) then
+          l_i_start = l
+          m_i_start = m
+        end if
+        if (index<=i_end) then
+          l_i_end = l
+          m_i_end = m 
+        end if 
+      end do
     end do
-  end do
-
+  end do 
   ! Itterate over angular momentum to calculate the matrix elements
   do l = l_i_start,l_i_end  
-    write(tmp_character, "(A2,I4)")  'l0', l
-    call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
-    CHKERRA(ierr)
-    ! Figure out how many digits are needed for the input file
-    if ( l .le. 9 ) then
-      fmt = '(I1.1)'
-    elseif (l .le. 99) then
-      fmt = '(I2.2)'
-    else
-      fmt = '(I3.3)'
-    endif
-    ! l converted to a string
-    write(strl,fmt) l
+    do m = -min(tdse_mmax,l),min(tdse_mmax,l)
+      write(tmp_character, "(A2,I4)")  'l0', l
+      call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
+      write(tmp_character, "(A2,I4)")  'm0', m
+      call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
+      CHKERRA(ierr)
+      ! Figure out how many digits are needed for the input file
+      if ( l .le. 9 ) then
+        fmt = '(I1.1)'
+      elseif (l .le. 99) then
+        fmt = '(I2.2)'
+      else
+        fmt = '(I3.3)'
+      endif
+      ! l converted to a string
+      write(strl,fmt) l
 
-    ! Energy dataset name 
-    ener_name ='Energy_l'//trim(strl)
+      ! Energy dataset name 
+      ener_name ='Energy_l'//trim(strl)
 
-    ! Opens the Energy_l#l dataset
-    call h5dopen_f(file_id, ener_name, ener_id, h5_err)
-    
-    ! Sets the dimensions of the Energy data in the dataset
-    ener_dims(1) = nmax-l
-    ener_dims(2) = 2
-    
-    ! Fills the lth column of E(:,:) with the energy data from the dataset
-    call h5dread_f( ener_id, h5_kind, El(1:nmax-l,:), ener_dims, h5_err) 
-    E(1:nmax-l,l) = dcmplx(El(1:nmax-l,1),El(1:nmax-l,2))
-    ! Closes the dataset
-    call h5dclose_f( ener_id, h5_err)
-    ! For each l value we compute the corresponding matrix elements of H0
-    skip = .false.
-    do n=l+1,tdse_nmax    
-      if (num_block .ne. 0) then
-        do i = 1,num_block
-          if ( (block_n(i) .eq. n) .and. block_l(i) .eq. l) then
-            skip = .true.
-          end if
-        end do 
-      end if 
-      if (.not. skip) then
-        ! Here I convert the n and l value to its corresponding left_index 
-        left_index =  -1 + n - (l*(1 + l - 2*tdse_nmax))/2
-        ! Convert the real energy to a PetscScalar
-        val(1) = E(n-l,l)  
-        ! Insert the energy into the field free matrix 
-        call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
-        CHKERRA(ierr)
-      else 
-        ! Here I convert the n and l value to its corresponding left_index 
-        left_index =  -1 + n - (l*(1 + l - 2*tdse_nmax))/2
-        ! Convert the real energy to a PetscScalar
-        val(1) = 0d0  
-        ! Insert the energy into the field free matrix 
-        call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
-        CHKERRA(ierr)
-      end if 
+      ! Opens the Energy_l#l dataset
+      call h5dopen_f(file_id, ener_name, ener_id, h5_err)
+      
+      ! Sets the dimensions of the Energy data in the dataset
+      ener_dims(1) = nmax-l
+      ener_dims(2) = 2
+      
+      ! Fills the lth column of E(:,:) with the energy data from the dataset
+      call h5dread_f( ener_id, h5_kind, El(1:nmax-l,:), ener_dims, h5_err) 
+      E(1:nmax-l,l) = dcmplx(El(1:nmax-l,1),El(1:nmax-l,2))
+      ! Closes the dataset
+      call h5dclose_f( ener_id, h5_err)
+      ! For each l value we compute the corresponding matrix elements of H0
       skip = .false.
-    enddo
-  enddo
+      do n=l+1,tdse_nmax    
+        if (num_block .ne. 0) then
+          do i = 1,num_block
+            if ( (block_n(i) .eq. n) .and. (block_l(i) .eq. l) .and. observables_only .eq. 0) then
+              skip = .true.
+            end if
+          end do 
+        end if 
+        if (.not. skip) then
+          ! Here I convert the n and l value to its corresponding left_index 
+          left_index =  indicies(n,l,m,tdse_nmax,tdse_mmax)
+          ! Convert the real energy to a PetscScalar
+          val(1) = E(n-l,l)  
+          ! Insert the energy into the field free matrix 
+          call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
+          CHKERRA(ierr)
+        else 
+          ! Here I convert the n and l value to its corresponding left_index 
+          left_index =  indicies(n,l,m,tdse_nmax,tdse_mmax)
+          ! Convert the real energy to a PetscScalar
+          val(1) = 0d0  
+          ! Insert the energy into the field free matrix 
+          call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
+          CHKERRA(ierr)
+        end if 
+        skip = .false.
+      end do
+    end do 
+  end do
   status = chdir(trim(working_directory))
   ! Build the matrix
   call MatAssemblyBegin(H0,MAT_FINAL_ASSEMBLY,ierr)

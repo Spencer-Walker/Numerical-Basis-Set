@@ -16,10 +16,10 @@ def find_between_r( s, first, last ):
 
 root = os.getcwd()
 
-x = np.zeros(3001)
-y = np.zeros(3001)
+x = np.zeros(200)
+y = np.zeros(200)
 
-for i in range(0,3001):
+for i in range(50,250):
   print i
   os.chdir(str(i))
   if glob("H_rho.output") != []:
@@ -29,11 +29,11 @@ for i in range(0,3001):
     file_in = open(file_name[0])
     for line in file_in:
       last = line
-    x[i] = i - 1500
-    y[i] = find_between_r(last,',',')')
+    x[i-50] = float(i)/1000.0
+    y[i-50] = find_between_r(last,',',')')
   else:
-    x[i] = i - 1500
-    y[i] = 0.0
+    x[i-50] = float(i)/1000.0
+    y[i-50] = 0.0
   os.chdir(root)
 
 np.savetxt("relative_delay.txt", x, fmt="%s")
@@ -48,6 +48,7 @@ fig.savefig(os.getcwd()+'/ionization.png')
 plt.clf()
 plt.close(fig)
 
+"""
 energy = 0.1875
 fig = plt.figure(figsize=(24, 18), dpi=80)
 data = y
@@ -85,3 +86,4 @@ plt.tight_layout()
 fig.savefig(os.getcwd()+'/fft.png')
 plt.clf()
 plt.close(fig)
+"""
