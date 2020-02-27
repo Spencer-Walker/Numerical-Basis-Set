@@ -68,8 +68,7 @@ use iso_c_binding
   ! Initialize hdf5 
   call h5open_f( h5_err)
   if ( h5_err .ne. 0 ) then
-    call PetscPrintf(MPI_COMM_WORLD, 'h5open_f failed\n', ierr)
-    CHKERRA(ierr)
+    call PetscPrintf(MPI_COMM_WORLD, 'h5open_f failed\n', ierr);CHKERRA(ierr)
     stop
   end if
 

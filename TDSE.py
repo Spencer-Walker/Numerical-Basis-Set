@@ -3,6 +3,7 @@ import json
 import h5py
 import numpy as np
 import sympy as syms
+from scipy.sparse import diags
 from sympy import lambdify
 from numpy import linalg as LA
 path = os.path.dirname(os.path.realpath(__file__))
@@ -79,7 +80,7 @@ def electric_field(lam,I,shape,frequency_shift,t,num_cycles,t_start,custom_enval
           
     if ellipticity == 0.0:
       A, tt = syms.symbols('A tt')
-      A = light*E0*2.0**((4.0*(-tt + t_cep)**2.0)/T0**2.0)*syms.sin(wa*(tt-t_cep)+cep)/wa
+      A = light*E0*2.0**(-(4.0*(-tt + t_cep)**2.0)/T0**2.0)*syms.sin(wa*(tt-t_cep)+cep)/wa
       F = lambdify(tt,-syms.diff(A,tt)/light, 'numpy')
       for i in range(len(t)):
         if t_start <= t[i] < t_end:
@@ -108,7 +109,7 @@ def json_to_hdf5(key,val,group):
     data = val
     for key,val in data.items():
       json_to_hdf5(key,val,grp)
-  elif isinstance(val,unicode):
+  elif isinstance(val,str):
     dset = group.create_dataset(str(key),(1,),dtype = "S"+str(len(val)))
     dset[0] =  np.string_(val) 
   elif isinstance(val,int):
@@ -172,10 +173,19 @@ elif re_a1 > 1e-10 or im_a1 > 1e-10 or re_a2 > 1e-10 or im_a2 > 1e-10:
   V = potential(c0,zc,a,b,c,r,cap_present,gobbler,cap_re_alpha1 = re_a1,cap_im_alpha1 = im_a1,cap_re_alpha2 = re_a2,cap_im_alpha2 = im_a2,cap_beta=beta)
 else:
   V = potential(c0,zc,a,b,c,r,cap_present,gobbler)
+
+
+dV =((diags(np.ones(num_points-1),1)-diags(np.ones(num_points-1),-1))/(2*r[1])).dot(np.transpose(V))
+
+dV = np.transpose(dV)
+
+
 dset = params["EPS"].create_dataset("V",(2,num_points),dtype = "f8")
 dset[:,:] = V[:,:]
 dset = params["EPS"].create_dataset("r",(num_points,),dtype = "f8")
 dset[:] = r[:]
+dset = params["EPS"].create_dataset("dV",(2,num_points),dtype = "f8")
+dset[:,:] = dV[:,:]
 conEV = 27.2110
 dt = np.zeros((len(data["laser"]["pulse"]),))
 L = np.zeros((len(data["laser"]["pulse"]),))
@@ -192,7 +202,7 @@ for i in range(len(data["laser"]["pulse"])):
       mu = 8.0*np.log(2.0)/np.pi**2.0
     else:
       mu = 0.0
-  print mu
+
   w = 1239.8006/(data["laser"]["pulse"][i]["wavelength"]*conEV)
   wa = 2.0*w/(1.0 + np.sqrt(1.0 + mu/data["laser"]["pulse"][i]["cycles"]**2.0))
   T0 = data["laser"]["pulse"][i]["cycles"]*2.0*np.pi/wa

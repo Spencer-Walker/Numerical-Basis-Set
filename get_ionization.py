@@ -16,12 +16,16 @@ def find_between_r( s, first, last ):
 
 root = os.getcwd()
 
-x = np.zeros(200)
-y = np.zeros(200)
+x = np.zeros(3000)
+y = np.zeros(3000)
+k = 0
 
-for i in range(50,250):
+delay_min = 1000
+delay_max = 1500
+for j in range(delay_min+1500,delay_max+1500):
+  i = j -1500
   print i
-  os.chdir(str(i))
+  os.chdir(str(j))
   if glob("H_rho.output") != []:
     file_name = glob('slurm*')
     if file_name == []:
@@ -29,32 +33,33 @@ for i in range(50,250):
     file_in = open(file_name[0])
     for line in file_in:
       last = line
-    x[i-50] = float(i)/1000.0
-    y[i-50] = find_between_r(last,',',')')
-  else:
-    x[i-50] = float(i)/1000.0
-    y[i-50] = 0.0
+    x[k] = float(i)
+    y[k] = find_between_r(last,',',')')
   os.chdir(root)
+  k+= 1
 
-np.savetxt("relative_delay.txt", x, fmt="%s")
-np.savetxt("ionization.txt",y, fmt="%s")
+x = x[0:k-1]
+y = y[0:k-1]
+print "Here",x.shape,y.shape
+np.savetxt("relative_delay_"+str(delay_min)+'_'+str(delay_max)+".txt", x, fmt="%s")
+np.savetxt("ionization_"+str(delay_min)+'_'+str(delay_max)+".txt",y, fmt="%s")
 
 fig = plt.figure(figsize=(24, 18), dpi=80)
 plt.plot(x,y)
 
 plt.grid(True, which='both')
 plt.tight_layout()
-fig.savefig(os.getcwd()+'/ionization.png')
+fig.savefig(os.getcwd()+'/ionization_'+str(delay_min)+'_'+str(delay_max)+'.png')
 plt.clf()
 plt.close(fig)
 
-"""
+
 energy = 0.1875
 fig = plt.figure(figsize=(24, 18), dpi=80)
 data = y
 data = data * np.blackman(data.shape[0])
 padd2 = 2**np.ceil(np.log2(data.shape[0] * 4))
-paddT = 3000*padd2 / data.shape[0]
+paddT = (delay_max-delay_min)*padd2 / data.shape[0]
 dH = 2 * np.pi / paddT 
 if np.max(data) > 1e-19:
   data = np.absolute(
@@ -73,6 +78,7 @@ x_min = 0
 x_max = 1.5
 plt.xlim([x_min, x_max])
 
+
 xticks = np.zeros(30)
 for i in range(0,10):
   xticks[0+3*i] = i*0.1875
@@ -80,10 +86,14 @@ for i in range(0,10):
   xticks[2+3*i] = (i+1)*0.1875-.0625
 
 plt.xticks(xticks)
+
 plt.ylim([1e-12*data.max(), 1*data.max()])
 plt.grid(True, which='both')
 plt.tight_layout()
-fig.savefig(os.getcwd()+'/fft.png')
+fig.savefig(os.getcwd()+'/fft_delay_'+str(delay_min)+'_'+str(delay_max)+'.png')
 plt.clf()
 plt.close(fig)
-"""
+
+np.savetxt("energy_"+str(delay_min)+"_"+str(delay_max)+".txt",np.arange(data.shape[0]) * dH, fmt="%s")
+np.savetxt("fft_ionization_"+str(delay_min)+'_'+str(delay_max)+".txt",data, fmt="%s")
+ 

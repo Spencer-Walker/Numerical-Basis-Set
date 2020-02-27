@@ -72,7 +72,6 @@ use ifport
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
     call PetscPrintf(MPI_COMM_WORLD, 'Unable to initialize PETSc\n', ierr)
-    CHKERRA(ierr)
     stop
   endif
 

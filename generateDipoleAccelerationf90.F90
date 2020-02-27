@@ -114,7 +114,7 @@ implicit none
   PetscInt            :: num_points, h5_err, tdse_nmax, tdse_lmax, tdse_mmax
   PetscInt            :: status, basis_local
   PetscReal           :: start_time, end_time
-  PetscReal,      allocatable :: r(:), wfn(:,:,:)
+  PetscReal,      allocatable :: wfn(:,:,:)
   PetscScalar,    allocatable :: val_z(:), v1(:), v2(:)
   PetscScalar,    allocatable :: val_x(:)
   PetscScalar,    allocatable :: val_y(:)
@@ -122,7 +122,7 @@ implicit none
   PetscInt,       allocatable :: col_x(:),col_y(:),col_z(:)
   logical             :: skip
   integer(HID_T)      :: psi_id, h5_kind
-  integer(HSIZE_T)    :: psi_dims(1:3), dims(1)
+  integer(HSIZE_T)    :: psi_dims(1:3), dims(1), dims2(2)
   integer(SIZE_T), parameter :: sdim = 300 
   integer(HID_T)      :: file_id, param_file_id
   integer(HID_T)      :: eps_group_id, memtype, eps_dat_id
@@ -145,6 +145,8 @@ implicit none
   integer :: Indicies, nnzx, nnzy, nnzz
   PetscScalar :: Angular, blah
   complex(16) :: blah2
+  PetscScalar, allocatable :: dV(:)
+  PetscReal,   allocatable :: dVV(:,:)
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
@@ -360,7 +362,6 @@ implicit none
   allocate(u(num_points,nmax,l_i_start:l_i_end+1))
   allocate(v1(num_points))
   allocate(v2(num_points))
-  allocate(r(num_points))
 
   do l = l_i_start,l_i_end+1
     allocate(wfn(1:num_points,1:nmax-l,2))
@@ -388,12 +389,17 @@ implicit none
     call h5dclose_f( psi_id, h5_err)
     deallocate(wfn)
   end do
+
+  allocate(dV(0:num_points-1))
+  allocate(dVV(0:num_points-1,2))
+
+  dims2(1) = num_points
+  dims2(2) = 2
+  call h5dopen_f(eps_group_id, "dV", eps_dat_id, h5_err)
+  call h5dread_f(eps_dat_id, H5T_NATIVE_DOUBLE, dVV, dims2, h5_err)
+  call h5dclose_f( eps_dat_id, h5_err)
+  dV = -dcmplx(dVV(:,1),0d0)
  
-! --------------------------------------------------------------------------
-! Create r Vector
-! --------------------------------------------------------------------------
-  r(:) = (/(i*h,i = 1,num_points)/)
-  r(:) = r(:)**(-2d0)
 ! --------------------------------------------------------------------------
   ! Itterate over angular momentum to calculate half the matrix elements
   !open(1, file = 'data1.dat', status = 'new')
@@ -426,7 +432,7 @@ implicit none
       N2_INT_LOOP: do n2 = l2+1, tdse_nmax
         v1 = u(:,n1-l1,l1)
         v2 = u(:,n2-l2,l2)
-        rint(n1-l1,n2-l2) = sum(v1*r*v2)
+        rint(n1-l1,n2-l2) = sum(v1*dV*v2)
 
       end do N2_INT_LOOP
     end do N1_INT_LOOP
@@ -557,7 +563,8 @@ implicit none
     CHKERRA(ierr)
   end if 
 
-  
+  deallocate(dV)
+  deallocate(dVV)  
   deallocate(val_z)
   deallocate(val_x)
   deallocate(val_y)
@@ -567,7 +574,6 @@ implicit none
   deallocate(v1)
   deallocate(v2)
   deallocate(u)
-  deallocate(r)
   deallocate(block_l)
   deallocate(block_n)
 

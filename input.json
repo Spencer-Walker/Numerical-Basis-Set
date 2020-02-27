@@ -1,7 +1,7 @@
 {
   "mpi":
   {
-    "np": 16,
+    "np": 2,
     "assign_host": 0,
     "host": "photon9,photon10"
   },
@@ -9,7 +9,7 @@
   {
     "propagate": 1,
     "delta_t": 0.05,
-    "l_max": 50,
+    "l_max": 15,
     "m_max": 0,
     "n_max": 100,   
     "mask_present": 0,
@@ -35,7 +35,7 @@
         "cycles": 2.0,
         "wavelength": 800.0,
         "gaussian_length": 5.0,
-        "intensity": 1.0e14,
+        "intensity": 1.0e12,
         "pulse_shape": "sin2",
         "custom_envalope_phase" : 0,
         "relative_delay": 0.0,
@@ -87,18 +87,18 @@
     "location": "/home/becker/spwa4419/Documents/Numerical-Basis-Set",
     "compute": 1,
     "label": "H",
-    "l_max": 50,
-    "n_max": 100,
+    "l_max": 20,
+    "n_max": 200,
     "delta_x": 0.1,
-    "R_max": 110.0,
-    "abs_tol": 1.0e-10,
-    "max_its": 100000,
+    "R_max": 200.0,
+    "abs_tol": 1.0e-8,
+    "max_its": 10000000000,
     "cap_present": 1,
-    "cap_eta": 0.0,
-    "cap_beta": 1.79,
-		"cap_re_alpha1": 2.61,
+    "cap_eta": 0.5,
+    "cap_beta": 0.0,
+		"cap_re_alpha1": 0.0,
 		"cap_im_alpha1": 0.0,
-		"cap_re_alpha2": 16.3,
+		"cap_re_alpha2": 0.0,
 		"cap_im_alpha2": 0.0,
 		"gobbler": 0.9,
     "EPSSetWhichEigenpairs": "EPS_SMALLEST_REAL",
@@ -113,11 +113,11 @@
     {
       "a": 
       [
-        0.0
+				0.0
       ],
       "b": 
       [
-        0.0
+				0.0
       ],
       "c":  0.0,
       "c0": 1.0,
