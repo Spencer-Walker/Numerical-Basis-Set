@@ -300,7 +300,7 @@ use iso_c_binding
 
   call h5dopen_f(operators_group_id, "mat_type", operators_dat_id, h5_err)
   call h5dread_f(operators_dat_id, memtype, tmp_character,dims, h5_err)
-  call h5dclose_f( eps_dat_id, h5_err)
+  call h5dclose_f(operators_dat_id, h5_err)
   if (trim(tmp_character) .eq. "MATSBAIJ") then
     mat_type = MATSBAIJ
   else if (trim(tmp_character) .eq. "MATAIJ") then

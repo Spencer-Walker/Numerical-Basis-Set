@@ -59,7 +59,7 @@ use ifport
   character(len = 12)  :: ener_name
   character(len = 300) :: tmp_character, basis_directory, working_directory
   MatType :: mat_type
-  PetscInt,   allocatable  :: block_n(:), block_l(:)
+  PetscInt,   allocatable  :: block_n(:), block_l(:), block_m(:)
   integer(HID_T)      :: block_group_id, block_dat_id
   PetscInt            :: num_block, observables_only
   integer :: indicies
@@ -87,50 +87,50 @@ use ifport
 
   call h5fopen_f( trim("parameters.h5"), H5F_ACC_RDONLY_F, param_file_id, h5_err)
   call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
-
   dims(1) = 1
   CALL H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
   CALL H5Tset_size_f(memtype, sdim, h5_err)
-
+  
   call h5dopen_f(eps_group_id, "label", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, memtype, label, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
-
+  
   call h5dopen_f(eps_group_id, "l_max", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, lmax, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
-
   call h5dopen_f(eps_group_id, "n_max", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, nmax, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
-
+  
   call h5dopen_f(eps_group_id, "location", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, memtype, basis_directory, dims, h5_err)
   call h5dclose_f(eps_dat_id, h5_err)
-
+  
   call h5dopen_f(eps_group_id, "local", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, basis_local, dims, h5_err)
   call h5dclose_f(eps_dat_id, h5_err)
-
+  
   call h5gopen_f(param_file_id, "TDSE", tdse_group_id, h5_err)
-
+  
   call h5dopen_f(tdse_group_id, "l_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_lmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-
+  
   call h5dopen_f(tdse_group_id, "m_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_mmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-
+  
   call h5dopen_f(tdse_group_id, "n_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, tdse_nmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
-
+  
   call h5gopen_f(param_file_id, "operators", operators_group_id, h5_err)
-
+  
   call h5dopen_f(operators_group_id, "mat_type", operators_dat_id, h5_err)
+  
   call h5dread_f(operators_dat_id, memtype, tmp_character,dims, h5_err)
-  call h5dclose_f( eps_dat_id, h5_err)
+  
+  call h5dclose_f( operators_dat_id, h5_err)
   if (trim(tmp_character) .eq. "MATSBAIJ") then
     mat_type = MATSBAIJ
   else if (trim(tmp_character) .eq. "MATAIJ") then
@@ -140,36 +140,40 @@ use ifport
     CHKERRA(ierr)
     mat_type = MATAIJ   
   end if 
-
   call h5gopen_f(param_file_id, "block_state", block_group_id, h5_err)
   dims(1) = 1
   call h5dopen_f(block_group_id, "observables_only", block_dat_id, h5_err)
   call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, observables_only, dims, h5_err)
   call h5dclose_f(block_dat_id, h5_err)
 
-
   call h5dopen_f(block_group_id, "num_block", block_dat_id, h5_err)
   call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, num_block, dims, h5_err)
   call h5dclose_f(block_dat_id, h5_err)
-
   allocate(block_n(num_block))
   allocate(block_l(num_block))
+  allocate(block_m(num_block))
+
   
-  dims(1) = num_block
+  if (num_block .ne. 0) then
+    dims(1) = num_block
+    call h5dopen_f(block_group_id, "n_index", block_dat_id, h5_err)
+    call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_n, dims, h5_err)
+    call h5dclose_f(block_dat_id, h5_err)
 
-  call h5dopen_f(block_group_id, "n_index", block_dat_id, h5_err)
-  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_n, dims, h5_err)
-  call h5dclose_f(block_dat_id, h5_err)
-
-  call h5dopen_f(block_group_id, "l_index", block_dat_id, h5_err)
-  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_l, dims, h5_err)
-  call h5dclose_f(block_dat_id, h5_err)
-
+    call h5dopen_f(block_group_id, "l_index", block_dat_id, h5_err)
+    call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_l, dims, h5_err)
+    call h5dclose_f(block_dat_id, h5_err)
+    
+    call h5dopen_f(block_group_id, "m_index", block_dat_id, h5_err)
+    call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_m, dims, h5_err)
+    call h5dclose_f(block_dat_id, h5_err)
+  end if
+  
   call MPI_Comm_rank(comm,proc_id,ierr)
   CHKERRA(ierr)
   call MPI_Comm_size(comm,num_proc,ierr)
   CHKERRA(ierr)
-
+   
   allocate(E(nmax,0:tdse_lmax))
   allocate(El(nmax,2))
   
@@ -263,7 +267,7 @@ use ifport
       do n=l+1,tdse_nmax    
         if (num_block .ne. 0) then
           do i = 1,num_block
-            if ( (block_n(i) .eq. n) .and. (block_l(i) .eq. l) .and. observables_only .eq. 0) then
+            if ( (block_n(i) .eq. n) .and. (block_l(i) .eq. l) .and. (block_m(i) .eq. m ) .and. observables_only .eq. 0) then
               skip = .true.
             end if
           end do 
@@ -312,7 +316,7 @@ use ifport
   deallocate(val)
   deallocate(block_l)
   deallocate(block_n)
-
+  deallocate(block_m)
   call MatDestroy(H0,ierr)
   CHKERRA(ierr)
   call h5fclose_f( file_id, h5_err)
