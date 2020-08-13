@@ -153,7 +153,6 @@ use ifport
   allocate(block_l(num_block))
   allocate(block_m(num_block))
 
-  
   if (num_block .ne. 0) then
     dims(1) = num_block
     call h5dopen_f(block_group_id, "n_index", block_dat_id, h5_err)
@@ -174,6 +173,7 @@ use ifport
   call MPI_Comm_size(comm,num_proc,ierr)
   CHKERRA(ierr)
    
+  
   allocate(E(nmax,0:tdse_lmax))
   allocate(El(nmax,2))
   
@@ -184,10 +184,8 @@ use ifport
   status = chdir(trim(basis_directory))
   ! Adds the .h5 extension to the input file 
   file_name = trim(label)//'.h5' 
-
   ! Opens the above file
-  call h5fopen_f( trim(file_name), H5F_ACC_RDWR_F, file_id, h5_err)
-
+  call h5fopen_f( trim(file_name), H5FD_MPIO_INDEPENDENT_F, file_id, h5_err)
   ! Converts fortrans double kind to an hdf5 double type 
   h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
 ! --------------------------------------------------------------------------

@@ -139,7 +139,7 @@ implicit none
   character(len = 300):: install_directory
   MatType :: mat_type
   PetscReal,  parameter :: pi = 3.141592653589793238462643383279502884197169
-  PetscInt,   allocatable  :: block_n(:), block_l(:)
+  PetscInt,   allocatable  :: block_n(:), block_l(:), block_m(:)
   integer(HID_T)      :: block_group_id, block_dat_id
   PetscInt            :: num_block
   integer :: Indicies, nnzx, nnzy, nnzz
@@ -246,17 +246,24 @@ implicit none
 
   allocate(block_n(num_block))
   allocate(block_l(num_block))
-  
+  allocate(block_m(num_block)) 
   dims(1) = num_block
 
-  call h5dopen_f(block_group_id, "n_index", block_dat_id, h5_err)
-  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_n, dims, h5_err)
-  call h5dclose_f(block_dat_id, h5_err)
+  if (num_block .ne. 0) then 
+    call h5dopen_f(block_group_id, "n_index", block_dat_id, h5_err)
+    call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_n, dims, h5_err)
+    call h5dclose_f(block_dat_id, h5_err)
 
-  call h5dopen_f(block_group_id, "l_index", block_dat_id, h5_err)
-  call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_l, dims, h5_err)
-  call h5dclose_f(block_dat_id, h5_err)
+    call h5dopen_f(block_group_id, "l_index", block_dat_id, h5_err)
+    call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_l, dims, h5_err)
+    call h5dclose_f(block_dat_id, h5_err)
+    
+    call h5dopen_f(block_group_id, "m_index", block_dat_id, h5_err)
+    call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_m, dims, h5_err)
+    call h5dclose_f(block_dat_id, h5_err)
 
+  end if
+  
   num_points = nint(Rmax/h)
 
   call MPI_Comm_rank(comm,proc_id,ierr)
@@ -270,7 +277,7 @@ implicit none
   file_name = trim(label)//'.h5'
 
   ! Opens the above file 
-  call h5fopen_f( trim(file_name), H5F_ACC_RDWR_F, file_id, h5_err)
+  call h5fopen_f( trim(file_name), H5FD_MPIO_INDEPENDENT_F, file_id, h5_err)
 
   ! Converts fortrans double kind to an hdf5 double type 
   h5_kind = h5kind_to_type( dp, H5_REAL_KIND)
@@ -452,10 +459,10 @@ implicit none
               skip = .false.  
               BLOCK_CONDITION: if ( num_block .ne. 0 )  then
                 BLOCK_LOOP: do i = 1,num_block
-                  ROW_CONDITION: if ( (block_n(i) .eq. n1) .and. block_l(i) .eq. l1) then
+                  ROW_CONDITION: if ( (block_n(i) .eq. n1) .and.(block_l(i) .eq. l1) .and. (block_m(i) .eq. m1)) then
                     skip = .true.
                   end if ROW_CONDITION
-                  COLUMN_CONDITION: if ( (block_n(i) .eq. n2) .and. block_l(i) .eq. l2) then
+                  COLUMN_CONDITION: if ( (block_n(i) .eq. n2) .and. (block_l(i) .eq. l2) .and. (block_m(i) .eq. m2)) then
                     skip = .true.
                   end if COLUMN_CONDITION
                 end do BLOCK_LOOP                
@@ -576,6 +583,7 @@ implicit none
   deallocate(u)
   deallocate(block_l)
   deallocate(block_n)
+  deallocate(block_m)
 
   call h5fclose_f( file_id, h5_err)
   call h5gclose_f( eps_group_id, h5_err)

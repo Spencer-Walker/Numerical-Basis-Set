@@ -96,7 +96,7 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
 
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
-
+ 
 
 !!  if ( dabs(dble(real(E(3,step)))) .ge. 1d-13) then
     call MatAXPY(J,E(3,step),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
@@ -113,7 +113,6 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
       CHKERRA(ierr)
  !!   end if 
   end if
- 
   if (masking_function_present .eq. 1) then
     call VecPointwiseMult(tmp, psi, mask_vector, ierr)
     CHKERRA(ierr)
@@ -310,7 +309,6 @@ use iso_c_binding
     CHKERRA(ierr)
     mat_type = MATAIJ   
   end if 
-
   call h5dopen_f(operators_group_id, "location", operators_dat_id, h5_err)
   call h5dread_f(operators_dat_id, memtype, operator_directory, dims, h5_err)
   call h5dclose_f(operators_dat_id, h5_err)
@@ -353,7 +351,6 @@ use iso_c_binding
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
-
 ! --------------------------------------------------------------------------
 ! Create Y_scale matrix
 ! --------------------------------------------------------------------------
@@ -389,7 +386,6 @@ use iso_c_binding
     call PetscViewerDestroy(viewer,ierr)
     CHKERRA(ierr)
   end if
-
 ! --------------------------------------------------------------------------
 ! Create X_scale matrix
 ! --------------------------------------------------------------------------
@@ -522,7 +518,6 @@ use iso_c_binding
     call PetscViewerDestroy(viewer,ierr)
     CHKERRA(ierr)
   end if 
-
 ! --------------------------------------------------------------------------
 ! Create the H0_scale matrix
 ! --------------------------------------------------------------------------
@@ -572,10 +567,10 @@ use iso_c_binding
   call h5dclose_f( laser_dat_id, h5_err)
 
   E = dcmplx(EE,0d0)
-
 ! --------------------------------------------------------------------------
 ! Create the Jacobian Matrix
 ! --------------------------------------------------------------------------
+  print*, 'here'
   call MatCreate(PETSC_COMM_WORLD,J,ierr)
   CHKERRA(ierr)
   call MatSetSizes(J,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
@@ -586,27 +581,25 @@ use iso_c_binding
   CHKERRA(ierr)
   call MatSetUp(J,ierr)
   CHKERRA(ierr)
+  call MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY,ierr)
+  call MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY,ierr)
   call MatCopy(H0_scale,J,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   told = 0.d0
 
-  print*, (maxval(dabs(dble(real(E(3,:))))))
-
-
 !!  if (maxval(dabs(dble(real(E(3,:))))) .ge. 1d-13) then
-    call MatAXPY(J,(0.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+    call MatAXPY(J,(1.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
     CHKERRA(ierr)
 !!  end if
   if (mmax .ne. 0) then
 !!    if (maxval(dabs(dble(real(E(1,:))))) .ge. 1d-13) then
-      call MatAXPY(J,(0.0d0,0.0d0),X_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+      call MatAXPY(J,(1.0d0,0.0d0),X_scale,DIFFERENT_NONZERO_PATTERN,ierr)
 !!    end if 
     
 !!    if (maxval(dabs(dble(real(E(2,:))))) .ge. 1d-13) then
-      call MatAXPY(J,(0.0d0,0.0d0),Y_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+      call MatAXPY(J,(1.0d0,0.0d0),Y_scale,DIFFERENT_NONZERO_PATTERN,ierr)
 !!    end if 
   end if
-
 ! --------------------------------------------------------------------------
 ! Propagate
 ! --------------------------------------------------------------------------
@@ -746,7 +739,6 @@ use iso_c_binding
     call VecSet(dipoleAY,(0d0,0d0),ierr)
     CHKERRA(ierr)
   end if
-
   ! Now we finally solve the system 
   call TSSolve(ts,psi,ierr)
   CHKERRA(ierr)

@@ -7,31 +7,10 @@
                 "relative_delay": 0.0,
                 "pulse_shape": "gaussian",
                 "gaussian_length": 5.0,
-                "intensity": 6700000000000.0,
+                "intensity": 67000000000000.0,
                 "cep": 0.0,
                 "wavelength": 243.0062872561377,
                 "cycles": 2.467316537,
-                "ellipticity": 0.0,
-                "normal_vec": [
-                    0,
-                    0,
-                    1
-                ],
-                "perp_vec": [
-                    1,
-                    0,
-                    0
-                ]
-            },
-            {
-                "custom_envalope_phase": 0,
-                "relative_delay": 1500,
-                "pulse_shape": "gaussian",
-                "gaussian_length": 5.0,
-                "intensity": 20000000000000.0,
-                "cep": 0.0,
-                "wavelength": 729.036733371392,
-                "cycles": 6.168140133,
                 "ellipticity": 0.0,
                 "normal_vec": [
                     0,
@@ -96,7 +75,7 @@
         "EPSSetTwoSided": 0,
         "ncv": -1,
         "m_max": 0,
-        "compute": 1,
+        "compute": 0,
         "max_its": 100000,
         "EPSSetType": "EPSKRYLOVSCHUR",
         "EPSSetWhichEigenpairs": "EPS_SMALLEST_REAL",
@@ -115,22 +94,22 @@
     },
     "block_state": {
         "observables_only": 0,
-        "l_index": [0],
-        "n_index": [1],
-        "m_index": [0],
-        "num_block": 1,
+        "l_index": [],
+        "n_index": [],
+        "m_index": [],
+        "num_block": 0,
         "sfa_tol": 1e-57,
         "sfa": 0
     },
     "mpi": {
-        "np": 3,
+        "np": 4,
         "host": "photon9,photon10",
         "assign_host": 0
     },
     "TDSE": {
         "l_max": 2,
         "mask_l_abs": 1000,
-        "delta_t": 0.1,
+        "delta_t": 1.0,
         "mask_n_abs": 1000,
         "mask_present": 0,
         "propagate": 1,
