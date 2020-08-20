@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J circular                # Job name
 #SBATCH -N 1                 # Total number of nodes (16 cores/node)
-#SBATCH -n 1              # Total number of tasks
+#SBATCH -n 4              # Total number of tasks
 #SBATCH --qos=normal
 #SBATCH -p photons                  # Queue name
 #SBATCH -o run_%j.log          # Name of stdout output file (%j expands to jobid)

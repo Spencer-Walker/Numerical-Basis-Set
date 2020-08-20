@@ -75,7 +75,7 @@
         "EPSSetTwoSided": 0,
         "ncv": -1,
         "m_max": 0,
-        "compute": 0,
+        "compute": 1,
         "max_its": 100000,
         "EPSSetType": "EPSKRYLOVSCHUR",
         "EPSSetWhichEigenpairs": "EPS_SMALLEST_REAL",

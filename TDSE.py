@@ -340,29 +340,4 @@ if data["TDSE"]["propagate"] == 1:
     print("propagatef90")
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
       " "+path+"/propagatef90")
-    file_in = open("H_rho.output",'r')
-    array = []
-    for line in file_in:
-      if ("Vec" not in line) and ("type" not in line) and ("Process" not in line): 
-        row = line.split()
-        array = array + [row[0]]
     #end for 
-"""
-    rho = []
-    print(type(array[0]))
-    for num in array:
-      rho = rho + [float(num)]
-    #end for 
-    rho = np.array(rho)
-    bound_pop = 0.0
-    i = 0
-    for l in range(0,data["TDSE"]["l_max"]+1):
-      for m in range(-l,l+1):
-        for n in range(l-1,data["TDSE"]["n_max"]):
-          if atom["Energy_l"+str(l)][0][n-l-1] < 0.0 and \
-          np.abs(atom["Energy_l"+str(l)][1][n-l-1]) < 1e-6:
-            bound_pop = bound_pop + rho[i]
-            i += 1
-    ionization = 1.0 - bound_pop 
-    print("ionization = ",ionization)
-"""
