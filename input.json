@@ -45,7 +45,8 @@
     },
     "operators": {
         "local": 1,
-        "compute": 1,
+        "compute": 0,
+        "radiation": 0,
         "location": "bhahdafsdfsd",
         "mat_type": "MATSBAIJ"
     },
@@ -75,7 +76,7 @@
         "EPSSetTwoSided": 0,
         "ncv": -1,
         "m_max": 0,
-        "compute": 1,
+        "compute": 0,
         "max_its": 100000,
         "EPSSetType": "EPSKRYLOVSCHUR",
         "EPSSetWhichEigenpairs": "EPS_SMALLEST_REAL",

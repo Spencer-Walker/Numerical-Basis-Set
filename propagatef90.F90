@@ -24,7 +24,7 @@ module time_propagation_module
   Mat :: Z_scale,X_scale,Y_scale,H0_scale,AX,AY,AZ
   PetscReal :: omega_vector_potential
   PetscScalar, allocatable :: E(:,:)
-  PetscInt  :: masking_function_present
+  PetscInt  :: masking_function_present, compute_rad
 end module time_propagation_module
 
 ! This program generates the dipole acceleration operator 
@@ -73,6 +73,8 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
   end if 
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
+
+if (compute_rad .eq. 1) then 
   call MatMult(AZ,psi,tmp,ierr)
   CHKERRA(ierr)
   call VecDot(psi,tmp,dotProduct,ierr)
@@ -93,25 +95,18 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
     call VecSetValue(dipoleAY,step,dotProduct,INSERT_VALUES,ierr)
     CHKERRA(ierr)
   end if
-
-  call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
-  CHKERRA(ierr)
+end if 
+  !call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
+  !CHKERRA(ierr)
  
 
-!!  if ( dabs(dble(real(E(3,step)))) .ge. 1d-13) then
     call MatAXPY(J,E(3,step),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
     CHKERRA(ierr)
-!!  end if
   if (mmax .ne. 0) then
-!!    if (dabs(dble(real(E(1,step)))) .ge. 1d-13) then
       call MatAXPY(J,E(1,step),X_scale,SUBSET_NONZERO_PATTERN,ierr)
       CHKERRA(ierr)
-!!    end if 
-    
-!!    if ( dabs(dble(real(E(2,step)))) .ge. 1d-13) then
       call MatAXPY(J,E(2,step),Y_scale,SUBSET_NONZERO_PATTERN,ierr)
       CHKERRA(ierr)
- !!   end if 
   end if
   if (masking_function_present .eq. 1) then
     call VecPointwiseMult(tmp, psi, mask_vector, ierr)
@@ -316,7 +311,10 @@ use iso_c_binding
   call h5dopen_f(operators_group_id, "local", operators_dat_id, h5_err)
   call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, operators_local, dims, h5_err)
   call h5dclose_f(operators_dat_id, h5_err)
-
+   
+  call h5dopen_f(operators_group_id, "radiation", operators_dat_id, h5_err)
+  call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, compute_rad, dims,h5_err)
+  call h5dclose_f(operators_dat_id, h5_err)
 
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
@@ -422,6 +420,7 @@ use iso_c_binding
     CHKERRA(ierr)
   end if 
 
+if (compute_rad .eq. 1) then
 ! --------------------------------------------------------------------------
 ! Create AZ matrix
 ! --------------------------------------------------------------------------
@@ -518,6 +517,7 @@ use iso_c_binding
     call PetscViewerDestroy(viewer,ierr)
     CHKERRA(ierr)
   end if 
+end if 
 ! --------------------------------------------------------------------------
 ! Create the H0_scale matrix
 ! --------------------------------------------------------------------------
@@ -570,7 +570,6 @@ use iso_c_binding
 ! --------------------------------------------------------------------------
 ! Create the Jacobian Matrix
 ! --------------------------------------------------------------------------
-  print*, 'here'
   call MatCreate(PETSC_COMM_WORLD,J,ierr)
   CHKERRA(ierr)
   call MatSetSizes(J,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
@@ -587,18 +586,12 @@ use iso_c_binding
   CHKERRA(ierr)
   told = 0.d0
 
-!!  if (maxval(dabs(dble(real(E(3,:))))) .ge. 1d-13) then
     call MatAXPY(J,(1.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
     CHKERRA(ierr)
-!!  end if
   if (mmax .ne. 0) then
-!!    if (maxval(dabs(dble(real(E(1,:))))) .ge. 1d-13) then
       call MatAXPY(J,(1.0d0,0.0d0),X_scale,DIFFERENT_NONZERO_PATTERN,ierr)
-!!    end if 
     
-!!    if (maxval(dabs(dble(real(E(2,:))))) .ge. 1d-13) then
       call MatAXPY(J,(1.0d0,0.0d0),Y_scale,DIFFERENT_NONZERO_PATTERN,ierr)
-!!    end if 
   end if
 ! --------------------------------------------------------------------------
 ! Propagate
@@ -723,7 +716,7 @@ use iso_c_binding
   CHKERRA(ierr)
 
 
-
+if ( compute_rad .eq. 1) then 
   call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,max_steps,dipoleAZ,ierr)
   CHKERRA(ierr)
   call VecSet(dipoleAZ,(0d0,0d0),ierr)
@@ -739,6 +732,7 @@ use iso_c_binding
     call VecSet(dipoleAY,(0d0,0d0),ierr)
     CHKERRA(ierr)
   end if
+end if 
   ! Now we finally solve the system 
   call TSSolve(ts,psi,ierr)
   CHKERRA(ierr)
@@ -756,6 +750,8 @@ use iso_c_binding
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
+
+if ( compute_rad .eq. 1) then
   call VecAssemblyBegin(dipoleAZ,ierr)
   CHKERRA(ierr)
   call VecAssemblyEnd(dipoleAZ,ierr)
@@ -799,6 +795,8 @@ use iso_c_binding
     call PetscViewerDestroy(viewer,ierr)
     CHKERRA(ierr)
   end if
+end if 
+
   call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
   & viewer,ierr)
   CHKERRA(ierr)
@@ -841,6 +839,14 @@ use iso_c_binding
 
   call MatDestroy(Z_scale,ierr)
   CHKERRA(ierr)
+  if (mmax .ne. 0) then 
+    call MatDestroy(X_scale,ierr)
+    CHKERRA(ierr)
+    call MatDestroy(Y_scale,ierr)
+    CHKERRA(ierr)
+  end if 
+
+if (compute_rad .eq. 1) then 
   call MatDestroy(AZ,ierr)
   CHKERRA(ierr)
   if ( mmax .ne. 0 ) then
@@ -849,10 +855,13 @@ use iso_c_binding
     call MatDestroy(AY,ierr)
     CHKERRA(ierr)
   end if
+end if 
   call VecDestroy(psi,ierr)
   CHKERRA(ierr)
   call VecDestroy(tmp,ierr)
   CHKERRA(ierr)
+
+if (compute_rad .eq. 1) then
   call VecDestroy(dipoleAZ,ierr)
   CHKERRA(ierr)
   if ( mmax .ne. 0 ) then
@@ -861,6 +870,7 @@ use iso_c_binding
     call VecDestroy(dipoleAY,ierr)
     CHKERRA(ierr)
   end if
+end if 
   call CPU_TIME(end_time)
   write(tmp_character, "(ES9.2)")  end_time-start_time
   call PetscPrintf(MPI_COMM_WORLD, 'time   :'//trim(tmp_character)//"\n", ierr)
