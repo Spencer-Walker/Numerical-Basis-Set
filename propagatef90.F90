@@ -71,59 +71,38 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
     call PetscPrintf(MPI_COMM_WORLD, "t = "//tstring//"\n", ierr)
     CHKERRA(ierr)
   end if 
-
   call MatCopy(H0_scale,J,SUBSET_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
 
-if (compute_rad .eq. 1) then 
-  if (zero_dir .ne. 3) then 
-    call MatMult(AZ,psi,tmp,ierr)
-    CHKERRA(ierr)
-    call VecDot(psi,tmp,dotProduct,ierr)
-    CHKERRA(ierr)
-    call VecSetValue(dipoleAZ,step,dotProduct,INSERT_VALUES,ierr)
-  end if 
-  CHKERRA(ierr)
-  if ( mmax .ne. 0 ) then
-    if (zero_dir .ne. 1) then 
-      call MatMult(AX,psi,tmp,ierr)
-      CHKERRA(ierr)
-      call VecDot(psi,tmp,dotProduct,ierr)
-      CHKERRA(ierr)
-      call VecSetValue(dipoleAX,step,dotProduct,INSERT_VALUES,ierr)
-      CHKERRA(ierr)
-    end if 
-    if (zero_dir .ne. 2) then 
-      call MatMult(AY,psi,tmp,ierr)
+  if (compute_rad .eq. 1) then 
+    if (zero_dir .ne. 3) then 
+      call MatMult(AZ,psi,tmp,ierr)
       CHKERRA(ierr)
       call VecDot(psi,tmp,dotProduct,ierr)
       CHKERRA(ierr)
       call VecSetValue(dipoleAZ,step,dotProduct,INSERT_VALUES,ierr)
       CHKERRA(ierr)
     end if 
+    if ( mmax .ne. 0 ) then
+      if (zero_dir .ne. 1) then
+        call MatMult(AX,psi,tmp,ierr)
+        CHKERRA(ierr)
+        call VecDot(psi,tmp,dotProduct,ierr)
+        CHKERRA(ierr)
+        call VecSetValue(dipoleAX,step,dotProduct,INSERT_VALUES,ierr)
+        CHKERRA(ierr)
+      end if 
+      if (zero_dir .ne. 2) then
+        call MatMult(AY,psi,tmp,ierr)
+        CHKERRA(ierr)
+        call VecDot(psi,tmp,dotProduct,ierr)
+        CHKERRA(ierr)
+        call VecSetValue(dipoleAY,step,dotProduct,INSERT_VALUES,ierr)
+        CHKERRA(ierr)
+      end if 
+    end if
   end if 
-
-  if ( mmax .ne. 0 ) then
-    if (zero_dir .ne. 1) then
-      call MatMult(AX,psi,tmp,ierr)
-      CHKERRA(ierr)
-      call VecDot(psi,tmp,dotProduct,ierr)
-      CHKERRA(ierr)
-      call VecSetValue(dipoleAX,step,dotProduct,INSERT_VALUES,ierr)
-      CHKERRA(ierr)
-    end if 
-    if (zero_dir .ne. 2) then 
-      call MatMult(AY,psi,tmp,ierr)
-      CHKERRA(ierr)
-      call VecDot(psi,tmp,dotProduct,ierr)
-      CHKERRA(ierr)
-      call VecSetValue(dipoleAY,step,dotProduct,INSERT_VALUES,ierr)
-      CHKERRA(ierr)
-    end if 
-  end if
-end if 
-  
-  if (zero_dir .ne. 3) then 
+  if (zero_dir .ne. 1) then  
     call MatAXPY(J,E(3,step),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
     CHKERRA(ierr)
   end if 
@@ -132,8 +111,7 @@ end if
       call MatAXPY(J,E(1,step),X_scale,SUBSET_NONZERO_PATTERN,ierr)
       CHKERRA(ierr)
     end if 
-
-    if (zero_dir .ne. 2) then    
+    if (zero_dir .ne. 2) then
       call MatAXPY(J,E(2,step),Y_scale,SUBSET_NONZERO_PATTERN,ierr)
       CHKERRA(ierr)
     end if 
@@ -180,15 +158,14 @@ use iso_c_binding
   PetscInt            :: operators_local
   integer(HSIZE_T)    :: dims(1), dims2(2)
   PetscReal           :: dt
-  PetscReal           :: maxtime, perp_vec(3), normal_vec(3)
+  PetscReal           :: maxtime
   character(len=15)   :: mask
   character(len = 15) :: label ! File name without .h5 extension
   external            :: RHSMatrixSchrodinger
-  PetscReal           :: start_time, end_time
-  integer(HID_T)      :: param_file_id
+  PetscReal           :: start_time, end_time, normal_vec(3), perp_vec(3)
+  integer(HID_T)      :: param_file_id, pulse_dat_id, pulse_group_id
   integer(HID_T)      :: eps_group_id, memtype, eps_dat_id
   integer(HID_T)      :: operators_group_id, operators_dat_id
-  integer(HID_T)      :: pulse_group_id, pulse_dat_id
   integer(HID_T)      :: start_group_id, start_dat_id
   integer(HID_T)      :: laser_group_id, laser_dat_id
   integer(HID_T)      :: tdse_group_id, tdse_dat_id
@@ -342,6 +319,12 @@ use iso_c_binding
   call h5dopen_f(operators_group_id, "local", operators_dat_id, h5_err)
   call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, operators_local, dims, h5_err)
   call h5dclose_f(operators_dat_id, h5_err)
+   
+  call h5dopen_f(operators_group_id, "radiation", operators_dat_id, h5_err)
+  call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, compute_rad, dims,h5_err)
+  call h5dclose_f(operators_dat_id, h5_err)
+
+
 
   call h5gopen_f(param_file_id, "laser", laser_group_id, h5_err)
   
@@ -358,10 +341,6 @@ use iso_c_binding
   call h5dread_f(laser_dat_id, H5T_NATIVE_DOUBLE, EE, dims2, h5_err)
   call h5dclose_f( laser_dat_id, h5_err)
    
-  call h5dopen_f(operators_group_id, "radiation", operators_dat_id, h5_err)
-  call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, compute_rad, dims,h5_err)
-  call h5dclose_f(operators_dat_id, h5_err)
-
   E = dcmplx(EE,0d0)
 
 
@@ -387,219 +366,216 @@ use iso_c_binding
 
   dims(1) = 1
 
+
+
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
 ! --------------------------------------------------------------------------
-  if (zero_dir .ne. 3) then  
+if (zero_dir .ne. 3) then 
+  if ( operators_local .eq. 0) then
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(operator_directory)//'/'//&
+    & trim(label)//'_Z.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  else 
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(label)//'_Z.bin',FILE_MODE_READ,viewer,ierr)
+    CHKERRA(ierr)
+  end if 
+
+  call MatCreate(MPI_COMM_WORLD,Z_scale,ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(Z_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  CHKERRA(ierr)
+  call MatSetType(Z_scale,mat_type,ierr)
+  CHKERRA(ierr)
+  call MatSetFromOptions(Z_scale,ierr)
+  CHKERRA(ierr)
+  call MatSetUp(Z_scale,ierr)
+  CHKERRA(ierr)
+  call MatGetOwnershipRange(Z_scale,i_start,i_end,ierr)
+  CHKERRA(ierr)
+  call MatLoad(Z_scale,viewer,ierr)
+  CHKERRA(ierr)
+  call MatScale(Z_scale,(0.d0,-1.d0),ierr)
+  CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
+end if 
+! --------------------------------------------------------------------------
+! Create Y_scale matrix
+! --------------------------------------------------------------------------
+if (zero_dir .ne. 2) then
+  if ( mmax .ne. 0) then
     if ( operators_local .eq. 0) then
       call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
       & trim(operator_directory)//'/'//&
-      & trim(label)//'_Z.bin',FILE_MODE_READ,viewer,ierr)
+      & trim(label)//'_Y.bin',FILE_MODE_READ,viewer,ierr)
       CHKERRA(ierr)
     else 
       call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-      & trim(label)//'_Z.bin',FILE_MODE_READ,viewer,ierr)
+      & trim(label)//'_Y.bin',FILE_MODE_READ,viewer,ierr)
       CHKERRA(ierr)
     end if 
 
-    call MatCreate(MPI_COMM_WORLD,Z_scale,ierr)
+    call MatCreate(MPI_COMM_WORLD,Y_scale,ierr)
     CHKERRA(ierr)
-    call MatSetSizes(Z_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    call MatSetSizes(Y_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
     CHKERRA(ierr)
-    call MatSetType(Z_scale,mat_type,ierr)
+    call MatSetType(Y_scale,mat_type,ierr)
     CHKERRA(ierr)
-    call MatSetFromOptions(Z_scale,ierr)
+    call MatSetFromOptions(Y_scale,ierr)
     CHKERRA(ierr)
-    call MatSetUp(Z_scale,ierr)
+    call MatSetUp(Y_scale,ierr)
     CHKERRA(ierr)
-    call MatGetOwnershipRange(Z_scale,i_start,i_end,ierr)
+    call MatGetOwnershipRange(Y_scale,i_start,i_end,ierr)
     CHKERRA(ierr)
-    call MatLoad(Z_scale,viewer,ierr)
+    call MatLoad(Y_scale,viewer,ierr)
     CHKERRA(ierr)
-    call MatScale(Z_scale,(0.d0,-1.d0),ierr)
+    call MatScale(Y_scale,(0.d0,-1.d0),ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+  end if
+end if 
+! --------------------------------------------------------------------------
+! Create X_scale matrix
+! --------------------------------------------------------------------------
+if (zero_dir .ne. 1) then
+  if (mmax .ne. 0) then
+    if ( operators_local .eq. 0) then
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(operator_directory)//'/'//&
+      & trim(label)//'_X.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    else 
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(label)//'_X.bin',FILE_MODE_READ,viewer,ierr)
+      CHKERRA(ierr)
+    end if 
+
+    call MatCreate(MPI_COMM_WORLD,X_scale,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(X_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(X_scale,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(X_scale,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(X_scale,ierr)
+    CHKERRA(ierr)
+    call MatGetOwnershipRange(X_scale,i_start,i_end,ierr)
+    CHKERRA(ierr)
+    call MatLoad(X_scale,viewer,ierr)
+    CHKERRA(ierr)
+    call MatScale(X_scale,(0.d0,-1.d0),ierr)
     CHKERRA(ierr)
     call PetscViewerDestroy(viewer,ierr)
     CHKERRA(ierr)
   end if 
-
-! --------------------------------------------------------------------------
-! Create Y_scale matrix
-! --------------------------------------------------------------------------
-
-  if ( mmax .ne. 0) then
-    if ( zero_dir .ne. 2 ) then
-      if ( operators_local .eq. 0) then
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(operator_directory)//'/'//&
-        & trim(label)//'_Y.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      else 
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(label)//'_Y.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      end if 
-
-      call MatCreate(MPI_COMM_WORLD,Y_scale,ierr)
-      CHKERRA(ierr)
-      call MatSetSizes(Y_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
-      CHKERRA(ierr)
-      call MatSetType(Y_scale,mat_type,ierr)
-      CHKERRA(ierr)
-      call MatSetFromOptions(Y_scale,ierr)
-      CHKERRA(ierr)
-      call MatSetUp(Y_scale,ierr)
-      CHKERRA(ierr)
-      call MatGetOwnershipRange(Y_scale,i_start,i_end,ierr)
-      CHKERRA(ierr)
-      call MatLoad(Y_scale,viewer,ierr)
-      CHKERRA(ierr)
-      call MatScale(Y_scale,(0.d0,-1.d0),ierr)
-      CHKERRA(ierr)
-      call PetscViewerDestroy(viewer,ierr)
-      CHKERRA(ierr)
-    end if
-  end if
-! --------------------------------------------------------------------------
-! Create X_scale matrix
-! --------------------------------------------------------------------------
-
-  if (mmax .ne. 0) then
-    if (zero_dir .ne. 1 ) then 
-      if ( operators_local .eq. 0) then
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(operator_directory)//'/'//&
-        & trim(label)//'_X.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      else 
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(label)//'_X.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      end if 
-
-      call MatCreate(MPI_COMM_WORLD,X_scale,ierr)
-      CHKERRA(ierr)
-      call MatSetSizes(X_scale,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
-      CHKERRA(ierr)
-      call MatSetType(X_scale,mat_type,ierr)
-      CHKERRA(ierr)
-      call MatSetFromOptions(X_scale,ierr)
-      CHKERRA(ierr)
-      call MatSetUp(X_scale,ierr)
-      CHKERRA(ierr)
-      call MatGetOwnershipRange(X_scale,i_start,i_end,ierr)
-      CHKERRA(ierr)
-      call MatLoad(X_scale,viewer,ierr)
-      CHKERRA(ierr)
-      call MatScale(X_scale,(0.d0,-1.d0),ierr)
-      CHKERRA(ierr)
-      call PetscViewerDestroy(viewer,ierr)
-      CHKERRA(ierr)
-    end if 
-  end if
-
+end if 
 if (compute_rad .eq. 1) then
 ! --------------------------------------------------------------------------
 ! Create AZ matrix
 ! --------------------------------------------------------------------------
-  if (zero_dir .ne. 3 ) then
-    if ( operators_local .eq. 0) then
-      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-      & trim(operator_directory)//'/'//&
-      & trim(label)//'_AZ.bin',FILE_MODE_READ,viewer,ierr)
-      CHKERRA(ierr)
-    else 
-      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-      & trim(label)//'_AZ.bin',FILE_MODE_READ,viewer,ierr)
-      CHKERRA(ierr)
-    end if 
-
-    call MatCreate(MPI_COMM_WORLD,AZ,ierr)
+if (zero_dir .ne. 3) then 
+  if ( operators_local .eq. 0) then
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(operator_directory)//'/'//&
+    & trim(label)//'_AZ.bin',FILE_MODE_READ,viewer,ierr)
     CHKERRA(ierr)
-    call MatSetSizes(AZ,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
-    CHKERRA(ierr)
-    call MatSetType(AZ,mat_type,ierr)
-    CHKERRA(ierr)
-    call MatSetFromOptions(AZ,ierr)
-    CHKERRA(ierr)
-    call MatSetUp(AZ,ierr)
-    CHKERRA(ierr)
-    call MatGetOwnershipRange(AZ,i_start,i_end,ierr)
-    CHKERRA(ierr)
-    call MatLoad(AZ,viewer,ierr)
-    CHKERRA(ierr)
-    call PetscViewerDestroy(viewer,ierr)
+  else 
+    call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+    & trim(label)//'_AZ.bin',FILE_MODE_READ,viewer,ierr)
     CHKERRA(ierr)
   end if 
 
+  call MatCreate(MPI_COMM_WORLD,AZ,ierr)
+  CHKERRA(ierr)
+  call MatSetSizes(AZ,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+  CHKERRA(ierr)
+  call MatSetType(AZ,mat_type,ierr)
+  CHKERRA(ierr)
+  call MatSetFromOptions(AZ,ierr)
+  CHKERRA(ierr)
+  call MatSetUp(AZ,ierr)
+  CHKERRA(ierr)
+  call MatGetOwnershipRange(AZ,i_start,i_end,ierr)
+  CHKERRA(ierr)
+  call MatLoad(AZ,viewer,ierr)
+  CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
+end if 
 ! --------------------------------------------------------------------------
 ! Create AY matrix
 ! --------------------------------------------------------------------------
-  if (zero_dir .ne. 2) then
-    if (mmax .ne. 0) then
-      if ( operators_local .eq. 0) then
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(operator_directory)//'/'//&
-        & trim(label)//'_AY.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      else 
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(label)//'_AY.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      end if 
-
-      call MatCreate(MPI_COMM_WORLD,AY,ierr)
+if (zero_dir .ne. 2) then 
+  if (mmax .ne. 0) then
+    if ( operators_local .eq. 0) then
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(operator_directory)//'/'//&
+      & trim(label)//'_AY.bin',FILE_MODE_READ,viewer,ierr)
       CHKERRA(ierr)
-      call MatSetSizes(AY,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
-      CHKERRA(ierr)
-      call MatSetType(AY,mat_type,ierr)
-      CHKERRA(ierr)
-      call MatSetFromOptions(AY,ierr)
-      CHKERRA(ierr)
-      call MatSetUp(AY,ierr)
-      CHKERRA(ierr)
-      call MatGetOwnershipRange(AY,i_start,i_end,ierr)
-      CHKERRA(ierr)
-      call MatLoad(AY,viewer,ierr)
-      CHKERRA(ierr)
-      call PetscViewerDestroy(viewer,ierr)
+    else 
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(label)//'_AY.bin',FILE_MODE_READ,viewer,ierr)
       CHKERRA(ierr)
     end if 
+
+    call MatCreate(MPI_COMM_WORLD,AY,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(AY,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(AY,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(AY,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(AY,ierr)
+    CHKERRA(ierr)
+    call MatGetOwnershipRange(AY,i_start,i_end,ierr)
+    CHKERRA(ierr)
+    call MatLoad(AY,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
   end if 
 end if 
 ! --------------------------------------------------------------------------
 ! Create AX matrix
 ! --------------------------------------------------------------------------
-  if (zero_dir .ne. 1) then
-    if (mmax .ne. 0) then
-      if ( operators_local .eq. 0) then
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(operator_directory)//'/'//&
-        & trim(label)//'_AX.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      else 
-        call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
-        & trim(label)//'_AX.bin',FILE_MODE_READ,viewer,ierr)
-        CHKERRA(ierr)
-      end if 
-
-      call MatCreate(MPI_COMM_WORLD,AX,ierr)
+if (zero_dir .ne. 1) then 
+  if (mmax .ne. 0) then
+    if ( operators_local .eq. 0) then
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(operator_directory)//'/'//&
+      & trim(label)//'_AX.bin',FILE_MODE_READ,viewer,ierr)
       CHKERRA(ierr)
-      call MatSetSizes(AX,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
-      CHKERRA(ierr)
-      call MatSetType(AX,mat_type,ierr)
-      CHKERRA(ierr)
-      call MatSetFromOptions(AX,ierr)
-      CHKERRA(ierr)
-      call MatSetUp(AX,ierr)
-      CHKERRA(ierr)
-      call MatGetOwnershipRange(AX,i_start,i_end,ierr)
-      CHKERRA(ierr)
-      call MatLoad(AX,viewer,ierr)
-      CHKERRA(ierr)
-      call PetscViewerDestroy(viewer,ierr)
+    else 
+      call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
+      & trim(label)//'_AX.bin',FILE_MODE_READ,viewer,ierr)
       CHKERRA(ierr)
     end if 
-  end if
+
+    call MatCreate(MPI_COMM_WORLD,AX,ierr)
+    CHKERRA(ierr)
+    call MatSetSizes(AX,PETSC_DECIDE,PETSC_DECIDE,size,size,ierr)
+    CHKERRA(ierr)
+    call MatSetType(AX,mat_type,ierr)
+    CHKERRA(ierr)
+    call MatSetFromOptions(AX,ierr)
+    CHKERRA(ierr)
+    call MatSetUp(AX,ierr)
+    CHKERRA(ierr)
+    call MatGetOwnershipRange(AX,i_start,i_end,ierr)
+    CHKERRA(ierr)
+    call MatLoad(AX,viewer,ierr)
+    CHKERRA(ierr)
+    call PetscViewerDestroy(viewer,ierr)
+    CHKERRA(ierr)
+  end if 
+end if 
+end if 
 ! --------------------------------------------------------------------------
 ! Create the H0_scale matrix
 ! --------------------------------------------------------------------------
@@ -651,20 +627,16 @@ end if
   call MatCopy(H0_scale,J,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   told = 0.d0
-
-  print*, (maxval(dabs(dble(real(E(3,:))))))
-
-  if (zero_dir .ne. 3) then
-    call MatAXPY(J,(0.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+  if (zero_dir .ne. 3) then 
+    call MatAXPY(J,(1.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
     CHKERRA(ierr)
   end if 
-
   if (mmax .ne. 0) then
-    if (zero_dir .ne. 1) then
-      call MatAXPY(J,(0.0d0,0.0d0),X_scale,DIFFERENT_NONZERO_PATTERN,ierr)
-    end if
-    if (zero_dir .ne. 2) then 
-      call MatAXPY(J,(0.0d0,0.0d0),Y_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+    if (zero_dir .ne. 1) then 
+      call MatAXPY(J,(1.0d0,0.0d0),X_scale,DIFFERENT_NONZERO_PATTERN,ierr)
+    end if 
+    if (zero_dir .ne. 2) then
+      call MatAXPY(J,(1.0d0,0.0d0),Y_scale,DIFFERENT_NONZERO_PATTERN,ierr)
     end if 
   end if
 ! --------------------------------------------------------------------------
@@ -734,7 +706,7 @@ end if
   CHKERRA(ierr)
   ! Tell the timestepper context what type of solver to use. I'll use 
   ! Crank-Nicolson, but this can be changed via a command line option
-  call TSSetType(ts,TSCN,ierr)
+  call TSSetType(ts,TSTHETA,ierr)
   CHKERRA(ierr)
   ! We will provide the Jacobian matrix only. Petsc will find the RHS. 
   call TSSetRHSFunction(ts,PETSC_NULL_VEC,TSComputeRHSFunctionLinear, &
@@ -912,45 +884,52 @@ end if
   call MatDestroy(H0_scale,ierr)
   CHKERRA(ierr)
 
-
-  call MatDestroy(Z_scale,ierr)
-  CHKERRA(ierr)
-
+  if (zero_dir .ne. 3) then 
+    call MatDestroy(Z_scale,ierr)
+    CHKERRA(ierr)
+  end if 
+  if (mmax .ne. 0) then 
+    if (zero_dir .ne. 1) then  
+      call MatDestroy(X_scale,ierr)
+      CHKERRA(ierr)
+    end if 
+    if (zero_dir .ne. 2) then 
+      call MatDestroy(Y_scale,ierr)
+      CHKERRA(ierr)
+    end if 
+  end if 
 
 if (compute_rad .eq. 1) then 
   if (zero_dir .ne. 3) then 
     call MatDestroy(AZ,ierr)
     CHKERRA(ierr)
-  end if
-
+  end if 
   if ( mmax .ne. 0 ) then
-    if (zero_dir .ne. 1) then
+    if (zero_dir .ne. 1) then 
       call MatDestroy(AX,ierr)
       CHKERRA(ierr)
-    end if
-    if(zero_dir .ne. 2) then 
+    end if 
+    if (zero_dir .ne. 2) then 
       call MatDestroy(AY,ierr)
       CHKERRA(ierr)
-    end if 
+    end if
   end if
 end if 
-
   call VecDestroy(psi,ierr)
   CHKERRA(ierr)
   call VecDestroy(tmp,ierr)
   CHKERRA(ierr)
 
-if (compute_rad .eq. 1) then 
+if (compute_rad .eq. 1) then
   if (zero_dir .ne. 3) then 
     call VecDestroy(dipoleAZ,ierr)
     CHKERRA(ierr)
   end if 
-  
   if ( mmax .ne. 0 ) then
-    if (zero_dir .ne. 1) then 
+    if (zero_dir .ne. 1 ) then 
       call VecDestroy(dipoleAX,ierr)
       CHKERRA(ierr)
-    end if 
+    end if     
     if (zero_dir .ne. 2) then 
       call VecDestroy(dipoleAY,ierr)
       CHKERRA(ierr)

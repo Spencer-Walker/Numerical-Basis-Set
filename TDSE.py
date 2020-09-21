@@ -269,7 +269,7 @@ if data["EPS"]["compute"] == 1 :
   else:
     print("basisf90")
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
-      " "+path+"/basisf90 -eps_monitor")
+      " "+path+"/basisf90")
 
 params = h5py.File('parameters.h5','r+')
 if data["EPS"]["local"] == 0:
@@ -340,3 +340,4 @@ if data["TDSE"]["propagate"] == 1:
     print("propagatef90")
     os.system("mpirun -np " + str(data["mpi"]["np"]) + \
       " "+path+"/propagatef90")
+    #end for 
