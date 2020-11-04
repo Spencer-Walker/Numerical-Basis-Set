@@ -19,6 +19,7 @@ module time_propagation_module
   use petscts
   implicit none
   Vec :: tmp, mask_vector, dipoleAX, dipoleAY, dipoleAZ
+  Vec :: rho_stuck
   PetscReal :: told 
   PetscInt :: mmax
   Mat :: Z_scale,X_scale,Y_scale,H0_scale,AX,AY,AZ
@@ -120,6 +121,17 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
     call VecPointwiseMult(tmp, psi, mask_vector, ierr)
     CHKERRA(ierr)
     call TSSetSolution(ts, tmp, ierr)
+    CHKERRA(ierr)
+  else 
+    call VecCopy(psi, tmp, ierr)
+    CHKERRA(ierr)
+    call VecAbs(tmp, ierr)
+    CHKERRA(ierr)
+    call VecPointwiseMult(tmp, tmp, tmp, ierr)
+    CHKERRA(ierr)
+    call VecPointwiseMult(tmp, mask_vector, tmp, ierr)
+    CHKERRA(ierr)
+    call VecAXPY(rho_stuck, (1d0,0d0)*dt, tmp, ierr)
     CHKERRA(ierr)
   end if 
 
@@ -604,8 +616,9 @@ end if
   CHKERRA(ierr)
   call MatLoad(H0_scale,viewer,ierr)
   CHKERRA(ierr)
-  call MatScale(H0_scale,(0.d0,-1.d0),ierr)
-  CHKERRA(ierr)
+  !call MatScale(H0_scale,(0.d0,-1.d0),ierr)
+  !CHKERRA(ierr)
+  ! ^ Has been moved to simplify energy shift code (just happens later now)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 
@@ -659,7 +672,13 @@ end if
   CHKERRA(ierr)
   call VecDuplicate(psi,tmp,ierr)
   CHKERRA(ierr)
+  call VecDuplicate(psi,rho_stuck,ierr)
+  CHKERRA(ierr)
   call VecDuplicate(psi,mask_vector,ierr)
+  CHKERRA(ierr)
+  call VecCopy(psi,rho_stuck,ierr)
+  CHKERRA(ierr)
+  call VecScale(rho_stuck, (0d0, 0d0), ierr)
   CHKERRA(ierr)
 
   ! Create the masking vector
@@ -690,11 +709,28 @@ end if
         end do
       end do 
     end do
-    call VecAssemblyBegin(mask_vector,ierr) 
+  else 
+    call MatGetDiagonal(H0_scale, mask_vector, ierr)
     CHKERRA(ierr)
-    call VecAssemblyEnd(mask_vector,ierr)
+    call MatGetDiagonal(H0_scale, tmp, ierr)
+    CHKERRA(ierr)
+    call VecConjugate(mask_vector, ierr)
+    CHKERRA(ierr)
+    call VecAXPY(mask_vector, (-1d0,0d0), tmp, ierr)
+    CHKERRA(ierr)
+    call VecScale(mask_vector, (0d0,-1d0), ierr)
     CHKERRA(ierr)
   end if 
+
+
+
+  call MatScale(H0_scale,(0.d0,-1.d0),ierr)
+  CHKERRA(ierr)
+
+  call VecAssemblyBegin(mask_vector,ierr) 
+  CHKERRA(ierr)
+  call VecAssemblyEnd(mask_vector,ierr)
+  CHKERRA(ierr)
 
   ! Create timestepper context where to compute solutions
   call TSCreate(PETSC_COMM_WORLD,ts,ierr)
@@ -850,6 +886,9 @@ end if
   CHKERRA(ierr)
   call VecView(psi,viewer,ierr)
   CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
+
   call VecSum(psi,norm,ierr)
   CHKERRA(ierr)
 
@@ -860,6 +899,26 @@ end if
     print*, 1.0 - dble(real(norm))
   end if 
   
+  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho_stuck.output',&
+  & viewer,ierr)
+  CHKERRA(ierr)
+  call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+  CHKERRA(ierr)
+  call VecView(rho_stuck,viewer,ierr)
+  CHKERRA(ierr)
+  call PetscViewerDestroy(viewer,ierr)
+  CHKERRA(ierr)
+
+  call VecSum(rho_stuck,norm,ierr)
+  CHKERRA(ierr)
+
+  write(tmp_character, "(ES9.2)")  dble(real(norm))
+  call PetscPrintf(MPI_COMM_WORLD, 'Norm Stuck ='//trim(tmp_character)//"\n", ierr)
+  CHKERRA(ierr)
+  if (proc_id .eq. 0) then
+    print*, 1.0 - dble(real(norm))
+  end if 
+
 ! --------------------------------------------------------------------------
 ! Clear memory
 ! --------------------------------------------------------------------------

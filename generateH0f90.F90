@@ -32,17 +32,17 @@ use ifport
 ! Declarations
 ! --------------------------------------------------------------------------
   PetscInt,   parameter :: dp = kind(1.d0)
-  PetscErrorCode      :: ierr
-  Mat                 :: H0
-  PetscInt            :: i_start, i_end, index, l_i_end, l_i_start
-  PetscInt            :: m_i_start, m_i_end
-  PetscViewer         :: viewer
-  PetscMPIInt         :: proc_id, num_proc, comm 
-  PetscInt            :: l, n, nmax, lmax, size, left_index, h5_err
-  PetscInt            :: tdse_nmax, tdse_lmax, tdse_mmax, m, i, basis_local, status
+  PetscErrorCode  :: ierr
+  Mat             :: H0
+  PetscInt        :: i_start, i_end, index, l_i_end, l_i_start
+  PetscInt        :: m_i_start, m_i_end
+  PetscViewer     :: viewer
+  PetscMPIInt     :: proc_id, num_proc, comm 
+  PetscInt        :: l, n, nmax, lmax, size, left_index, h5_err
+  PetscInt        :: tdse_nmax, tdse_lmax, tdse_mmax, m, i, basis_local, status
   PetscScalar, allocatable :: val(:)
   PetscInt,    allocatable :: col(:)
-  PetscReal, allocatable   :: El(:,:)
+  PetscReal,   allocatable :: El(:,:)
   PetscScalar, allocatable :: E(:,:)
   PetscReal  :: start_time, end_time
   logical :: skip
@@ -60,8 +60,12 @@ use ifport
   character(len = 300) :: tmp_character, basis_directory, working_directory
   MatType :: mat_type
   PetscInt,   allocatable  :: block_n(:), block_l(:), block_m(:)
-  integer(HID_T)      :: block_group_id, block_dat_id
-  PetscInt            :: num_block, observables_only
+  PetscInt,   allocatable  :: shift_n(:), shift_l(:), shift_m(:)
+  PetscReal,  allocatable  :: energy_shift(:)
+  integer(HID_T)  :: block_group_id, block_dat_id
+  integer(HID_T)  :: shift_group_id, shift_dat_id
+  PetscInt        :: num_block, observables_only
+  PetscInt        :: num_shift
   integer :: indicies
 ! --------------------------------------------------------------------------
 ! Beginning of Program
@@ -167,7 +171,39 @@ use ifport
     call h5dread_f(block_dat_id, H5T_NATIVE_INTEGER, block_m, dims, h5_err)
     call h5dclose_f(block_dat_id, h5_err)
   end if
-  
+
+  call h5gopen_f(param_file_id, "complex_energy_shift", shift_group_id, h5_err)
+  dims(1) = 1
+  call h5dopen_f(shift_group_id, "num_shift", shift_dat_id, h5_err)
+  call h5dread_f(shift_dat_id, H5T_NATIVE_INTEGER, num_shift, dims, h5_err)
+  call h5dclose_f(shift_dat_id, h5_err)
+
+  allocate(shift_n(num_shift))
+  allocate(shift_l(num_shift))
+  allocate(shift_m(num_shift))
+  allocate(energy_shift(num_shift))
+
+  if (num_shift .ne. 0) then
+    dims(1) = num_shift
+    call h5dopen_f(shift_group_id, "n_index", shift_dat_id, h5_err)
+    call h5dread_f(shift_dat_id, H5T_NATIVE_INTEGER, shift_n, dims, h5_err)
+    call h5dclose_f(shift_dat_id, h5_err)
+
+    call h5dopen_f(shift_group_id, "l_index", shift_dat_id, h5_err)
+    call h5dread_f(shift_dat_id, H5T_NATIVE_INTEGER, shift_l, dims, h5_err)
+    call h5dclose_f(shift_dat_id, h5_err)
+    
+    call h5dopen_f(shift_group_id, "m_index", shift_dat_id, h5_err)
+    call h5dread_f(shift_dat_id, H5T_NATIVE_INTEGER, shift_m, dims, h5_err)
+    call h5dclose_f(shift_dat_id, h5_err)
+
+    call h5dopen_f(shift_group_id, "gamma", shift_dat_id, h5_err)
+    call h5dread_f(shift_dat_id, H5T_NATIVE_DOUBLE, energy_shift, dims, h5_err)
+    call h5dclose_f(shift_dat_id, h5_err)
+    print*, energy_shift, num_shift
+  end if
+
+
   call MPI_Comm_rank(comm,proc_id,ierr)
   CHKERRA(ierr)
   call MPI_Comm_size(comm,num_proc,ierr)
@@ -274,7 +310,14 @@ use ifport
           ! Here I convert the n and l value to its corresponding left_index 
           left_index =  indicies(n,l,m,tdse_nmax,tdse_mmax)
           ! Convert the real energy to a PetscScalar
-          val(1) = E(n-l,l)  
+          val(1) = E(n-l,l) 
+          if (num_shift .ne. 0) then 
+            do i = 1,num_shift
+              if ( (shift_n(i) .eq. n) .and. (shift_l(i) .eq. l) .and. (shift_m(i) .eq. m )) then
+                val(1) = val(1) - (0d0,0.5d0)*energy_shift(i)
+              end if
+            end do 
+          end if 
           ! Insert the energy into the field free matrix 
           call MatSetValue(H0,left_index,left_index,val(1),INSERT_VALUES,ierr)
           CHKERRA(ierr)
@@ -315,6 +358,9 @@ use ifport
   deallocate(block_l)
   deallocate(block_n)
   deallocate(block_m)
+  deallocate(shift_l)
+  deallocate(shift_n)
+  deallocate(shift_m)
   call MatDestroy(H0,ierr)
   CHKERRA(ierr)
   call h5fclose_f( file_id, h5_err)

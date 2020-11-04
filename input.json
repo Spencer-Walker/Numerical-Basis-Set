@@ -5,12 +5,12 @@
             {
                 "custom_envalope_phase": 0,
                 "relative_delay": 0.0,
-                "pulse_shape": "gaussian",
+                "pulse_shape": "sin2",
                 "gaussian_length": 5.0,
-                "intensity": 67000000000000.0,
+                "intensity": 6700000000000.0,
                 "cep": 0.0,
-                "wavelength": 243.0062872561377,
-                "cycles": 2.467316537,
+                "wavelength": 656.0997,
+                "cycles": 10,
                 "ellipticity": 0.0,
                 "normal_vec": [
                     0,
@@ -27,13 +27,13 @@
     },
     "start_state": {
         "n_index": [
-            1
+            2
         ],
         "phase": [
             0.0
         ],
         "l_index": [
-            0
+            1
         ],
         "m_index": [
             0
@@ -51,15 +51,15 @@
         "mat_type": "MATSBAIJ"
     },
     "EPS": {
-        "l_max": 1,
+        "l_max": 10,
         "EPSSetBalance": "EPS_BALANCE_NONE",
         "cap_present": 1,
         "R_max": 100.0,
         "cap_eta": 0.5,
         "abs_tol": 1e-10,
-        "label": "He",
+        "label": "H",
         "location": "blah",
-        "n_max": 2,
+        "n_max": 100,
         "local": 1,
         "mpd": -1,
         "delta_x": 0.05,
@@ -76,47 +76,55 @@
         "EPSSetTwoSided": 0,
         "ncv": -1,
         "m_max": 0,
-        "compute": 1,
+        "compute": 0,
         "max_its": 100000,
         "EPSSetType": "EPSKRYLOVSCHUR",
         "EPSSetWhichEigenpairs": "EPS_SMALLEST_REAL",
         "nuclei": {
             "a": [
-                0.3953
             ],
-            "c": 2.0329,
+            "c": 0.0,
             "b": [
-                6.1805
             ],
             "c0": 1.0,
-            "Zc": 1.0
+            "Zc": 0.0
         },
         "EPSSetProblemType": "EPS_NHEP"
     },
     "block_state": {
         "observables_only": 0,
-        "l_index": [],
-        "n_index": [],
-        "m_index": [],
-        "num_block": 0,
+        "l_index": [0,
+             0],
+        "n_index": [1,
+             2],
+        "m_index": [0,
+             0],
+        "num_block": 2,
         "sfa_tol": 1e-57,
         "sfa": 0
     },
+    "complex_energy_shift":{
+        "l_index": [0],
+        "n_index": [3],
+        "m_index": [0],
+        "gamma": [0.5],
+        "num_shift": 1
+    },
     "mpi": {
-        "np": 2,
+        "np": 11,
         "host": "photon9,photon10",
         "assign_host": 0
     },
     "TDSE": {
-        "l_max": 1,
+        "l_max": 10,
         "mask_l_abs": 1000,
-        "delta_t": 1.0,
+        "delta_t": 0.05,
         "mask_n_abs": 1000,
         "mask_present": 0,
         "propagate": 1,
         "mask_type": "cosine",
         "m_max": 0,
-        "n_max": 2,
+        "n_max": 100,
         "mask_pow": 1.0
     }
 }
