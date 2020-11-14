@@ -819,8 +819,8 @@ end if
   call TSSolve(ts,psi,ierr)
   CHKERRA(ierr)
 
-  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_psi.output',&
-  & viewer,ierr)
+  call PetscViewerHDF5Open(PETSC_COMM_WORLD,trim(label)//'_psi.h5',&
+  & FILE_MODE_WRITE,viewer,ierr)
   CHKERRA(ierr)
   call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
   CHKERRA(ierr)
@@ -848,29 +848,23 @@ if ( compute_rad .eq. 1) then
     call VecAssemblyEnd(dipoleAY,ierr)
     CHKERRA(ierr)
   end if
-  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationZ.output',&
-  & viewer,ierr)
-  CHKERRA(ierr)
-  call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+  call PetscViewerHDF5Open(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationZ.h5',&
+  & FILE_MODE_WRITE,viewer,ierr)
   CHKERRA(ierr)
   call VecView(dipoleAZ,viewer,ierr)
   CHKERRA(ierr)
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
   if ( mmax .ne. 0 ) then
-    call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationX.output',&
-    & viewer,ierr)
-    CHKERRA(ierr)
-    call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+    call PetscViewerHDF5Open(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationX.h5',&
+    & FILE_MODE_WRITE,viewer,ierr)
     CHKERRA(ierr)
     call VecView(dipoleAX,viewer,ierr)
     CHKERRA(ierr)
     call PetscViewerDestroy(viewer,ierr)
     CHKERRA(ierr)
-    call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationY.output',&
-    & viewer,ierr)
-    CHKERRA(ierr)
-    call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+    call PetscViewerHDF5Open(PETSC_COMM_WORLD,trim(label)//'_dipoleAccelerationY.h5',&
+    & FILE_MODE_WRITE,viewer,ierr)
     CHKERRA(ierr)
     call VecView(dipoleAY,viewer,ierr)
     CHKERRA(ierr)
@@ -879,10 +873,8 @@ if ( compute_rad .eq. 1) then
   end if
 end if 
 
-  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho.output',&
-  & viewer,ierr)
-  CHKERRA(ierr)
-  call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+  call PetscViewerHDF5Open(PETSC_COMM_WORLD,trim(label)//'_rho.h5',&
+  & FILE_MODE_WRITE,viewer,ierr)
   CHKERRA(ierr)
   call VecView(psi,viewer,ierr)
   CHKERRA(ierr)
@@ -899,10 +891,8 @@ end if
     print*, 1.0 - dble(real(norm))
   end if 
   
-  call PetscViewerASCIIOpen(PETSC_COMM_WORLD,trim(label)//'_rho_stuck.output',&
-  & viewer,ierr)
-  CHKERRA(ierr)
-  call PetscViewerPushFormat(viewer,PETSC_VIEWER_ASCII_COMMON,ierr)
+  call PetscViewerHDF5Open(PETSC_COMM_WORLD,trim(label)//'_rho_stuck.h5',&
+  & FILE_MODE_WRITE,viewer,ierr)
   CHKERRA(ierr)
   call VecView(rho_stuck,viewer,ierr)
   CHKERRA(ierr)
