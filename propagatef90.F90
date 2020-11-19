@@ -103,16 +103,25 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
       end if 
     end if
   end if 
-  if (zero_dir .ne. 1) then  
+  if (zero_dir .ne. 3) then  
+    if (step .eq. 0) then
+      print*, 'c'
+    end if 
     call MatAXPY(J,E(3,step),Z_scale,SUBSET_NONZERO_PATTERN,ierr)
     CHKERRA(ierr)
   end if 
   if (mmax .ne. 0) then
-    if (zero_dir .ne. 1) then 
+    if (zero_dir .ne. 1) then
+      if (step .eq. 0) then 
+        print*, 'a' 
+      end if 
       call MatAXPY(J,E(1,step),X_scale,SUBSET_NONZERO_PATTERN,ierr)
       CHKERRA(ierr)
     end if 
     if (zero_dir .ne. 2) then
+      if (step .eq. 0) then
+        print*, 'b'
+      end if  
       call MatAXPY(J,E(2,step),Y_scale,SUBSET_NONZERO_PATTERN,ierr)
       CHKERRA(ierr)
     end if 
@@ -371,7 +380,7 @@ use iso_c_binding
   
   zero_dir = 0
   do i = 1,3
-    if (abs(perp_vec(i)) + abs(normal_vec(i))  .lt. 1d-15) then 
+    if ( abs(normal_vec(i))  .gt. 1.d0-1d-15) then 
       zero_dir = i
     end if 
   end do 
