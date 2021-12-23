@@ -29,12 +29,12 @@ use iso_c_binding
   Vec            :: Vi
   EPS            :: eps
   EPSType        :: tname
-  PetscBool      :: cap_present
+  PetscBool      :: cap_present, rot_present
   PetscInt       :: num_points, i, j, Istart, Iend, l_start, l_stop, l_stride
   PetscInt       :: nev, ncv, mpd, ncon, maxits, lmax, l
   PetscInt       :: row(1), col(3), tmp_int
   PetscInt, allocatable :: ix(:), IPIV(:)
-  PetscReal :: cap_eta
+  PetscReal :: cap_eta, rot_theta
   PetscErrorCode :: ierr
   EPSProblemType :: eps_problem
   PetscScalar    :: value(3), rint 
@@ -106,6 +106,22 @@ use iso_c_binding
     cap_eta = 0.0d0
   end if 
   
+  call h5dopen_f(eps_group_id, "rot_present", eps_dat_id, h5_err)
+  call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, tmp_int, dims, h5_err)
+  call h5dclose_f( eps_dat_id, h5_err)  
+  
+  if (tmp_int .eq. 1) then
+    rot_present = .true.
+    call h5dopen_f(eps_group_id, "rot_theta", eps_dat_id, h5_err)
+    call h5dread_f(eps_dat_id, H5T_NATIVE_DOUBLE, rot_theta, dims, h5_err)
+    call h5dclose_f( eps_dat_id, h5_err)
+  else
+    rot_present = .false.
+  end if
+  if ( rot_present .eqv. .false.) then
+    rot_theta = 0.d0
+  end if
+
   call h5dopen_f(eps_group_id, "cap_eta", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_DOUBLE, cap_eta, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
@@ -364,14 +380,14 @@ use iso_c_binding
     call h5dread_f(eps_dat_id, H5T_NATIVE_DOUBLE, VV, dims2, h5_err)
     call h5dclose_f( eps_dat_id, h5_err)
     V = dcmplx(VV(:,1),VV(:,2))
-    V = V + dble(l*(l+1))/(2d0*r**2d0)
+    V = V + zexp((0d0,-2d0)*rot_theta)* dble(l*(l+1))/(2d0*r**2d0)
 
     if (Istart .eq. 0) then
       row(1) = 0
       col(1) = 0
       col(2) = 1
-      value(1) =  1.0d0/(dr**2.0d0) + V(Istart)
-      value(2) = -0.5d0/(dr**2.0d0)
+      value(1) =  zexp((0d0,-2d0)*rot_theta)*1.0d0/(dr**2.0d0) + V(Istart)
+      value(2) = -zexp((0d0,-2d0)*rot_theta)*0.5d0/(dr**2.0d0)
       call MatSetValues(H,1,row,2,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
       Istart = Istart+1
     end if
@@ -380,21 +396,21 @@ use iso_c_binding
       row(1) = num_points-1
       col(1) = num_points-2
       col(2) = num_points-1
-      value(1) = -0.5d0/(dr**2.0d0)
-      value(2) =  1.0d0/(dr**2.0d0) + V(num_points-1) 
+      value(1) = -zexp((0d0,-2d0)*rot_theta)*0.5d0/(dr**2.0d0)
+      value(2) =  zexp((0d0,-2d0)*rot_theta)*1.0d0/(dr**2.0d0) + V(num_points-1) 
       call MatSetValues(H,1,row,2,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
       Iend = Iend-1
     end if
 
-    value(1) = -0.5d0/(dr**2.0d0)
-    value(2) =  1.0d0/(dr**2.0d0) 
-    value(3) = -0.5d0/(dr**2.0d0)
+    value(1) = -zexp((0d0,-2d0)*rot_theta)*0.5d0/(dr**2.0d0)
+    value(2) =  zexp((0d0,-2d0)*rot_theta)*1.0d0/(dr**2.0d0) 
+    value(3) = -zexp((0d0,-2d0)*rot_theta)*0.5d0/(dr**2.0d0)
     do i=Istart,Iend-1
       row(1) = i
       col(1) = i-1
       col(2) = i
       col(3) = i+1
-      value(2) =  1.0d0/(dr**2.0d0) + V(i)
+      value(2) =  zexp((0d0,-2d0)*rot_theta)*1.0d0/(dr**2.0d0) + V(i)
       call MatSetValues(H,1,row,3,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
     end do
 

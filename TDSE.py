@@ -6,14 +6,20 @@ import sympy as syms
 from scipy.sparse import diags
 from sympy import lambdify
 from numpy import linalg as LA
+import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.realpath(__file__))
 light = 137.035999084
-def potential(c0,zc,a,b,c,r,cap_present,gobbler,cap_eta=None,cap_re_alpha1=None,cap_im_alpha1=None,cap_re_alpha2=None,cap_im_alpha2=None,cap_beta=None):
+def potential(c0,zc,a,b,c,r,cap_present,rot_present,gobbler,cap_eta=None,cap_re_alpha1=None,cap_im_alpha1=None,cap_re_alpha2=None,cap_im_alpha2=None,cap_beta=None,rot_theta=None):
+  if rot_present == 1:
+    r = np.exp(1j*rot_theta)*r
   V =  np.zeros((2,len(r)))
-  V[0,:] += -c0/r
-  V[0,:] += -zc*np.exp(-c*r)/r
+  V[0,:] += np.real(-c0/r)
+  V[0,:] += np.real(-zc*np.exp(-c*r)/r)
+  V[1,:] += np.imag(-c0/r)
+  V[1,:] += np.imag(-zc*np.exp(-c*r)/r)
   for i in range(len(a)):
-    V[0,:] += -a[i]*np.exp(-b[i]*r)
+    V[0,:] += np.real(-a[i]*np.exp(-b[i]*r))
+    V[1,:] += np.imag(-a[i]*np.exp(-b[i]*r))
   if cap_present == 1:
     iabs = max(int(round(gobbler*Rmax/dr)) - 1,0)
     if cap_eta != None:
@@ -160,6 +166,8 @@ c = data["EPS"]["nuclei"]["c"]
 c0 = data["EPS"]["nuclei"]["c0"]
 zc = data["EPS"]["nuclei"]["Zc"]
 cap_present = data["EPS"]["cap_present"]
+rot_present = data["EPS"]["rot_present"]
+rot_theta = data["EPS"]["rot_theta"]
 eta = data["EPS"]["cap_eta"]
 beta = data["EPS"]["cap_beta"]
 re_a1 = data["EPS"]["cap_re_alpha1"]
@@ -167,13 +175,21 @@ im_a1 = data["EPS"]["cap_im_alpha1"]
 re_a2 = data["EPS"]["cap_re_alpha2"]
 im_a2 = data["EPS"]["cap_im_alpha2"]
 gobbler = data["EPS"]["gobbler"]
-if eta > 1e-10: 
-  V = potential(c0,zc,a,b,c,r,cap_present,gobbler,cap_eta = eta)
-elif re_a1 > 1e-10 or im_a1 > 1e-10 or re_a2 > 1e-10 or im_a2 > 1e-10:
-  V = potential(c0,zc,a,b,c,r,cap_present,gobbler,cap_re_alpha1 = re_a1,cap_im_alpha1 = im_a1,cap_re_alpha2 = re_a2,cap_im_alpha2 = im_a2,cap_beta=beta)
-else:
-  V = potential(c0,zc,a,b,c,r,cap_present,gobbler)
 
+if rot_present == 1:
+  V = potential(c0,zc,a,b,c,r,cap_present,rot_present,gobbler,rot_theta=rot_theta)
+else:
+  if eta > 1e-10: 
+    V = potential(c0,zc,a,b,c,r,cap_present,rot_present,gobbler,cap_eta = eta)
+  elif re_a1 > 1e-10 or im_a1 > 1e-10 or re_a2 > 1e-10 or im_a2 > 1e-10:
+    V = potential(c0,zc,a,b,c,r,cap_present,rot_present,gobbler,cap_re_alpha1 = re_a1,cap_im_alpha1 = im_a1,cap_re_alpha2 = re_a2,cap_im_alpha2 = im_a2,cap_beta=beta)
+  else:
+    V = potential(c0,zc,a,b,c,r,cap_present,rot_present,gobbler)
+
+plt.figure()
+plt.plot(r,V[0,:])
+plt.plot(r,V[1,:])
+plt.savefig('potential.png')
 
 dV =((diags(np.ones(num_points-1),1)-diags(np.ones(num_points-1),-1))/(2*r[1])).dot(np.transpose(V))
 

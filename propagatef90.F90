@@ -19,7 +19,6 @@ module time_propagation_module
   use petscts
   implicit none
   Vec :: tmp, mask_vector, dipoleAX, dipoleAY, dipoleAZ
-  Vec :: rho_stuck
   PetscReal :: told 
   PetscInt :: mmax
   Mat :: Z_scale,X_scale,Y_scale,H0_scale,AX,AY,AZ
@@ -103,7 +102,7 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
       end if 
     end if
   end if 
-  if (zero_dir .ne. 3) then  
+  if ((zero_dir .ne. 3).or. (mmax .eq. 0)) then  
     if (step .eq. 0) then
       print*, 'c'
     end if 
@@ -130,17 +129,6 @@ subroutine RHSMatrixSchrodinger(ts,t,psi,J,BB,user,ierr)
     call VecPointwiseMult(tmp, psi, mask_vector, ierr)
     CHKERRA(ierr)
     call TSSetSolution(ts, tmp, ierr)
-    CHKERRA(ierr)
-  else 
-    call VecCopy(psi, tmp, ierr)
-    CHKERRA(ierr)
-    call VecAbs(tmp, ierr)
-    CHKERRA(ierr)
-    call VecPointwiseMult(tmp, tmp, tmp, ierr)
-    CHKERRA(ierr)
-    call VecPointwiseMult(tmp, mask_vector, tmp, ierr)
-    CHKERRA(ierr)
-    call VecAXPY(rho_stuck, (1d0,0d0)*dt, tmp, ierr)
     CHKERRA(ierr)
   end if 
 
@@ -392,7 +380,7 @@ use iso_c_binding
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
 ! --------------------------------------------------------------------------
-if (zero_dir .ne. 3) then 
+if (zero_dir .ne. 3 .or. mmax .eq. 0) then 
   if ( operators_local .eq. 0) then
     call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
     & trim(operator_directory)//'/'//&
@@ -499,7 +487,7 @@ if (compute_rad .eq. 1) then
 ! --------------------------------------------------------------------------
 ! Create AZ matrix
 ! --------------------------------------------------------------------------
-if (zero_dir .ne. 3) then 
+if ( (zero_dir .ne. 3) .or. mmax .eq. 0) then 
   if ( operators_local .eq. 0) then
     call PetscViewerBinaryOpen(PETSC_COMM_WORLD,&
     & trim(operator_directory)//'/'//&
@@ -649,7 +637,7 @@ end if
   call MatCopy(H0_scale,J,DIFFERENT_NONZERO_PATTERN,ierr)
   CHKERRA(ierr)
   told = 0.d0
-  if (zero_dir .ne. 3) then 
+  if ((zero_dir .ne. 3) .or. mmax .eq.0) then 
     call MatAXPY(J,(1.0d0,0.0d0),Z_scale,DIFFERENT_NONZERO_PATTERN,ierr)
     CHKERRA(ierr)
   end if 
@@ -681,14 +669,10 @@ end if
   CHKERRA(ierr)
   call VecDuplicate(psi,tmp,ierr)
   CHKERRA(ierr)
-  call VecDuplicate(psi,rho_stuck,ierr)
-  CHKERRA(ierr)
+
   call VecDuplicate(psi,mask_vector,ierr)
   CHKERRA(ierr)
-  call VecCopy(psi,rho_stuck,ierr)
-  CHKERRA(ierr)
-  call VecScale(rho_stuck, (0d0, 0d0), ierr)
-  CHKERRA(ierr)
+
 
   ! Create the masking vector
   if (masking_function_present .eq. 1) then
@@ -900,23 +884,6 @@ end if
     print*, 1.0 - dble(real(norm))
   end if 
   
-  call PetscViewerHDF5Open(PETSC_COMM_WORLD,trim(label)//'_rho_stuck.h5',&
-  & FILE_MODE_WRITE,viewer,ierr)
-  CHKERRA(ierr)
-  call VecView(rho_stuck,viewer,ierr)
-  CHKERRA(ierr)
-  call PetscViewerDestroy(viewer,ierr)
-  CHKERRA(ierr)
-
-  call VecSum(rho_stuck,norm,ierr)
-  CHKERRA(ierr)
-
-  write(tmp_character, "(ES9.2)")  dble(real(norm))
-  call PetscPrintf(MPI_COMM_WORLD, 'Norm Stuck ='//trim(tmp_character)//"\n", ierr)
-  CHKERRA(ierr)
-  if (proc_id .eq. 0) then
-    print*, 1.0 - dble(real(norm))
-  end if 
 
 ! --------------------------------------------------------------------------
 ! Clear memory
@@ -942,7 +909,7 @@ end if
   call MatDestroy(H0_scale,ierr)
   CHKERRA(ierr)
 
-  if (zero_dir .ne. 3) then 
+  if ((zero_dir .ne. 3) .or. mmax .eq. 0) then 
     call MatDestroy(Z_scale,ierr)
     CHKERRA(ierr)
   end if 

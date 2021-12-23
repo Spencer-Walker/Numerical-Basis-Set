@@ -114,15 +114,15 @@ implicit none
   PetscInt            :: num_points, h5_err, tdse_nmax, tdse_lmax, tdse_mmax
   PetscInt            :: status, basis_local
   PetscReal           :: start_time, end_time
-  PetscReal,      allocatable :: r(:), wfn(:,:,:)
+  PetscReal,      allocatable :: r(:), wfn(:,:,:), El(:,:)
   PetscScalar,    allocatable :: val_z(:), v1(:), v2(:)
   PetscScalar,    allocatable :: val_x(:)
   PetscScalar,    allocatable :: val_y(:)
-  PetscScalar,    allocatable :: u(:,:,:)
+  PetscScalar,    allocatable :: u(:,:,:),E(:,:)
   PetscInt,       allocatable :: col_x(:),col_y(:),col_z(:)
   logical             :: skip
-  integer(HID_T)      :: psi_id, h5_kind
-  integer(HSIZE_T)    :: psi_dims(1:3), dims(1)
+  integer(HID_T)      :: psi_id, h5_kindl, ener_id, h5_kind
+  integer(HSIZE_T)    :: psi_dims(1:3), ener_dims(1:2), dims(1)
   integer(SIZE_T), parameter :: sdim = 300 
   integer(HID_T)      :: file_id, param_file_id
   integer(HID_T)      :: eps_group_id, memtype, eps_dat_id
@@ -132,7 +132,7 @@ implicit none
   real(fgsl_double)   :: threej_m0, ThreeJ
   character(len = 15) :: label ! File name without .h5 extension
   character(len = 3)  :: strl! file number
-  character(len = 12) :: psi_name
+  character(len = 12) :: psi_name, ener_name
   character(len = 6)  :: fmt ! format descriptor
   character(len = 30) :: file_name
   character(len = 300):: tmp_character, basis_directory, working_directory
@@ -145,10 +145,16 @@ implicit none
   integer :: Indicies, nnzx, nnzy, nnzz
   PetscScalar :: Angular, blah
   complex(16) :: blah2
+  integer :: ignore_couplings
+  PetscReal :: energy_truncation
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
   call CPU_TIME(start_time)
+
+#if 0 
+  Does this count? 
+#endif 
   
   call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
@@ -234,6 +240,14 @@ implicit none
     CHKERRA(ierr)
     mat_type = MATAIJ   
   end if 
+
+  call h5dopen_f(operators_group_id, "ignore_couplings", operators_dat_id, h5_err)
+  call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, ignore_couplings,dims, h5_err)
+  call h5dclose_f(operators_dat_id, h5_err)
+
+  call h5dopen_f(operators_group_id, "energy_truncation", operators_dat_id, h5_err)
+  call h5dread_f(operators_dat_id, H5T_NATIVE_DOUBLE, energy_truncation,dims, h5_err)
+  call h5dclose_f(operators_dat_id, h5_err)
 
   call h5gopen_f(param_file_id, "block_state", block_group_id, h5_err)
 
@@ -367,6 +381,8 @@ implicit none
   allocate(u(num_points,nmax,l_i_start:l_i_end+1))
   allocate(v1(num_points))
   allocate(v2(num_points))
+  allocate(E(nmax,0:tdse_lmax))
+  allocate(El(nmax,2))
   allocate(r(num_points))
 
   do l = l_i_start,l_i_end+1
@@ -381,7 +397,7 @@ implicit none
 
     write(strl,fmt) l
 
-    Psi_name = 'Psi_r_l'//trim(strl)
+    psi_name = 'Psi_r_l'//trim(strl)
     call h5dopen_f(file_id, psi_name, psi_id, h5_err)
 
     psi_dims(1) = int(Rmax/h)
@@ -393,6 +409,22 @@ implicit none
     
     u(1:num_points,1:nmax-l,l) = dcmplx(wfn(1:num_points,1:nmax-l,1),wfn(1:num_points,1:nmax-l,2))
     call h5dclose_f( psi_id, h5_err)
+
+          ! Energy dataset name 
+    ener_name ='Energy_l'//trim(strl)
+
+    ! Opens the Energy_l#l dataset
+    call h5dopen_f(file_id, ener_name, ener_id, h5_err)
+    
+    ! Sets the dimensions of the Energy data in the dataset
+    ener_dims(1) = nmax-l
+    ener_dims(2) = 2
+    
+    ! Fills the lth column of E(:,:) with the energy data from the dataset
+    call h5dread_f( ener_id, h5_kind, El(1:nmax-l,:), ener_dims, h5_err) 
+    E(1:nmax-l,l) = dcmplx(El(1:nmax-l,1),El(1:nmax-l,2))
+    ! Closes the dataset
+    call h5dclose_f( ener_id, h5_err)
     deallocate(wfn)
   end do
  
@@ -460,6 +492,9 @@ implicit none
                   end if COLUMN_CONDITION
                 end do BLOCK_LOOP                
               end if BLOCK_CONDITION
+              TRUNCATION_CONDITION: if (((ignore_couplings .eq. 1) .and. (real(E(n1-l1,l1))>energy_truncation)) .and. (real(E(n2-l2,l2))>energy_truncation)) then
+                skip = .true.
+              end if TRUNCATION_CONDITION
               SKIP_CONDITION: if (skip .eqv. .false.) then
                 right_index = Indicies(n2,l2,m2,tdse_nmax,tdse_mmax)
                 col_x(itter_x) = right_index
@@ -506,8 +541,6 @@ implicit none
     end do M1_LOOP
     deallocate(rint_left,rint)
   end do L_LOOP
-
-  print*, nnzx,nnzy,nnzz
 
   status = chdir(trim(working_directory))
 
@@ -577,6 +610,8 @@ implicit none
   deallocate(block_l)
   deallocate(block_n)
   deallocate(block_m)
+  deallocate(E)
+  deallocate(El)
   call h5fclose_f( file_id, h5_err)
   call h5gclose_f( eps_group_id, h5_err)
   call h5gclose_f( operators_group_id, h5_err)
