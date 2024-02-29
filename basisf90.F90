@@ -8,9 +8,9 @@ use fgsl
 use iso_c_binding
   implicit none
   PetscInt,   parameter :: dp = kind(1.d0)
-  PetscInt  :: nmax, INFO
+  PetscInt  :: nmax
   PetscReal :: Rmax
-  character(len = 15) :: label ! file name w/o .h5
+  character(len = 300) :: label ! file name w/o .h5
   integer(HID_T), allocatable :: psi_space_right(:), psi_dset_right(:)
   integer(HID_T), allocatable :: ener_space(:), ener_dset(:)
   integer(HID_T), allocatable :: psi_space_left(:), psi_dset_left(:)
@@ -81,6 +81,7 @@ use iso_c_binding
   call h5dopen_f(eps_group_id, "EPSSetBalance", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, memtype, tmp_character,dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
+  
   if (trim(tmp_character) .eq. "EPS_BALANCE_TWOSIDE") then
     eps_balance = EPS_BALANCE_TWOSIDE
   else if (trim(tmp_character) .eq. "EPS_BALANCE_ONESIDE") then
@@ -92,7 +93,7 @@ use iso_c_binding
     CHKERRA(ierr)
     eps_balance = EPS_BALANCE_NONE
   end if 
-  
+
   call h5dopen_f(eps_group_id, "cap_present", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, tmp_int, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
@@ -138,6 +139,7 @@ use iso_c_binding
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, nmax, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
 
+
   call h5dopen_f(eps_group_id, "R_max", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_DOUBLE, Rmax, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
@@ -161,6 +163,7 @@ use iso_c_binding
   call h5dopen_f(eps_group_id, "ncv", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, ncv, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
+
   if (ncv .eq. -1) then
     ncv = PETSC_DEFAULT_INTEGER
   end if 
@@ -234,8 +237,8 @@ use iso_c_binding
     eps_type = EPSLAPACK
   else if (trim(tmp_character) .eq. "EPSARPACK") then 
     eps_type = EPSARPACK
-  else if (trim(tmp_character) .eq. "EPSBLZPACK") then 
-    eps_type = EPSBLZPACK
+!  else if (trim(tmp_character) .eq. "EPSBLZPACK") then 
+!    eps_type = EPSBLZPACK
   else if (trim(tmp_character) .eq. "EPSTRLAN") then 
     eps_type = EPSTRLAN
   else if (trim(tmp_character) .eq. "EPSBLOPEX") then 
@@ -353,7 +356,7 @@ use iso_c_binding
     l_stop = lmax
     l_stride = 1 
   end if 
-
+  
   do l = l_start,l_stop,l_stride
     write(tmp_character, "(A2,I4)")  'lB', l
     call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
@@ -413,7 +416,7 @@ use iso_c_binding
       value(2) =  zexp((0d0,-2d0)*rot_theta)*1.0d0/(dr**2.0d0) + V(i)
       call MatSetValues(H,1,row,3,col,value,INSERT_VALUES,ierr);CHKERRA(ierr)
     end do
-
+    
     call MatAssemblyBegin(H,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
     call MatAssemblyEnd(H,MAT_FINAL_ASSEMBLY,ierr);CHKERRA(ierr)
     call MatCreateVecs(H,Vi,PETSC_NULL_VEC,ierr);CHKERRA(ierr)
@@ -488,17 +491,15 @@ use iso_c_binding
     allocate(IPIV(nev))
 
     do i = 1, num_points
-      ix(i) = i
+      ix(i) = i-1
     end do 
 
     do i = 0, nev-1
       call EPSGetEigenpair(eps,i,E_right(i+1),PETSC_NULL_SCALAR,Vi,PETSC_NULL_VEC,ierr);CHKERRA(ierr)
       call VecGetValues(Vi,num_points,ix,u_right(1:num_points,i+1),ierr);CHKERRA(ierr) 
-
       u_right(num_points,i+1) = (0d0,0d0)
       rint = sum(u_right(:,i+1)*u_right(:,i+1))
       u_right(:,i+1) = u_right(:,i+1)/zsqrt(rint)
-
       if (eps_two_sided .eqv. PETSC_TRUE) then
         call EPSGetLeftEigenvector(eps,i,Vi,PETSC_NULL_VEC,ierr);CHKERRA(ierr)
         call VecGetValues(Vi,num_points,ix,u_left(1:num_points,i+1),ierr);CHKERRA(ierr) 
@@ -518,63 +519,6 @@ use iso_c_binding
       end if
     end do 
 
-#if 0
-    if(eps_two_sided .eqv. PETSC_TRUE ) then
-      S = matmul(transpose(u_left),u_right)
-
-      call zgetrf(nev,nev,S,nev,IPIV,INFO)
-
-      if (INFO .ne. 0) then
-        call PetscPrintf(MPI_COMM_SELF, "'LU' factorization failed\n", ierr)
-        CHKERRA(ierr)
-        write(tmp_character, "(A10,I4)")  "exit code ", INFO
-        call PetscPrintf(MPI_COMM_SELF, trim(tmp_character)//"\n", ierr)
-        CHKERRA(ierr)
-      end if 
-
-      do i = 1, nev
-        if (IPIV(i) .ne. i) then
-          call PetscPrintf(MPI_COMM_SELF, "Pivits are hapening\n", ierr)
-          CHKERRA(ierr)
-          stop
-        end if 
-      end do 
-
-      UR = 0.d0
-      UL = 0.d0
-      do i = 1,nev
-        do j = i,nev
-          UR(i,j) = S(i,j)
-        end do
-      end do 
-      
-      do j = 1, nev
-        do i = j+1,nev
-          UL(i,j) = S(i,j)
-        end do
-      end do 
-
-      do i = 1,nev
-        UL(i,i) = 1.d0
-      end do 
-
-      call ztrtri('U','N',nev,UR,nev,INFO)
-      call ztrtri('L','N',nev,UL,nev,INFO)
-      
-      if (INFO .ne. 0) then
-        call PetscPrintf(MPI_COMM_SELF, 'Inversion failed\n', ierr)
-        CHKERRA(ierr)
-        stop
-      end if 
-
-
-      u_left = matmul(u_left,transpose(UL))
-
-      u_right = matmul(u_right,UR)
-    else
-      u_left = u_right
-    end if 
-#endif 
     u_left = u_right
     ! There will be nmax-l eigenstates for each l 
     ener_dims(1) = nmax-l
@@ -602,7 +546,6 @@ use iso_c_binding
     ! Writes u_left to Psi_l_l#l
     call h5dwrite_f( psi_dset_left(l), h5_kind, uu_left, psi_dims, h5_err)
 
-    
     deallocate(u_right)
     deallocate(uu_right)
     deallocate(EE_right)

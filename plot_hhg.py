@@ -17,7 +17,7 @@ for num in array:
   dipole_acceleration = dipole_acceleration + [float(num)]
 #end for 
 
-print "Plotting HHG Spectrum"
+print("Plotting HHG Spectrum")
 fig = plt.figure(figsize=(24, 18), dpi=80)
 energy =   0.0570
 data = np.array(dipole_acceleration)

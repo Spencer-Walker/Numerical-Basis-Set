@@ -130,7 +130,7 @@ implicit none
   integer(HID_T)      :: operators_group_id, operators_dat_id
   integer(HID_T)      :: tdse_group_id, tdse_dat_id
   real(fgsl_double)   :: threej_m0, ThreeJ
-  character(len = 15) :: label ! File name without .h5 extension
+  character(len = 300):: label ! File name without .h5 extension
   character(len = 3)  :: strl! file number
   character(len = 12) :: psi_name
   character(len = 6)  :: fmt ! format descriptor
@@ -152,7 +152,7 @@ implicit none
 ! --------------------------------------------------------------------------
   call CPU_TIME(start_time)
   
-  call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
+  call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
     call PetscPrintf(MPI_COMM_WORLD, 'Unable to initialize PETSc\n', ierr)
     CHKERRA(ierr)

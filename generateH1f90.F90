@@ -121,7 +121,7 @@ implicit none
   PetscScalar,    allocatable :: u(:,:,:),E(:,:)
   PetscInt,       allocatable :: col_x(:),col_y(:),col_z(:)
   logical             :: skip
-  integer(HID_T)      :: psi_id, h5_kindl, ener_id, h5_kind
+  integer(HID_T)      :: psi_id, ener_id, h5_kind
   integer(HSIZE_T)    :: psi_dims(1:3), ener_dims(1:2), dims(1)
   integer(SIZE_T), parameter :: sdim = 300 
   integer(HID_T)      :: file_id, param_file_id
@@ -130,7 +130,7 @@ implicit none
   integer(HID_T)      :: operators_group_id, operators_dat_id
   integer(HID_T)      :: tdse_group_id, tdse_dat_id
   real(fgsl_double)   :: threej_m0, ThreeJ
-  character(len = 15) :: label ! File name without .h5 extension
+  character(len = 300):: label ! File name without .h5 extension
   character(len = 3)  :: strl! file number
   character(len = 12) :: psi_name, ener_name
   character(len = 6)  :: fmt ! format descriptor
@@ -143,20 +143,15 @@ implicit none
   integer(HID_T)      :: block_group_id, block_dat_id
   PetscInt            :: num_block
   integer :: Indicies, nnzx, nnzy, nnzz
-  PetscScalar :: Angular, blah
-  complex(16) :: blah2
+  PetscScalar :: Angular
   integer :: ignore_couplings
   PetscReal :: energy_truncation
 ! --------------------------------------------------------------------------
 ! Beginning of Program
 ! --------------------------------------------------------------------------
   call CPU_TIME(start_time)
-
-#if 0 
-  Does this count? 
-#endif 
   
-  call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
+  call SlepcInitialize(PETSC_NULL_CHARACTER,ierr)
   if (ierr .ne. 0) then
     call PetscPrintf(MPI_COMM_WORLD, 'Unable to initialize PETSc\n', ierr)
     CHKERRA(ierr)

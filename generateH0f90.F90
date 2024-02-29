@@ -52,7 +52,7 @@ use ifport
   integer(HID_T)       :: eps_group_id, memtype, eps_dat_id
   integer(HID_T)       :: operators_group_id, operators_dat_id
   integer(HID_T)       :: tdse_group_id, tdse_dat_id
-  character(len = 15)  :: label ! File name without .h5 extension
+  character(len = 300)  :: label ! File name without .h5 extension
   character(len = 3)   :: strl  ! file number (l converted to a string)
   character(len = 6)   :: fmt   ! format descriptor
   character(len = 30)  :: file_name
@@ -98,7 +98,7 @@ use ifport
   call h5dopen_f(eps_group_id, "label", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, memtype, label, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
-  
+
   call h5dopen_f(eps_group_id, "l_max", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, H5T_NATIVE_INTEGER, lmax, dims, h5_err)
   call h5dclose_f( eps_dat_id, h5_err)
@@ -129,12 +129,10 @@ use ifport
   call h5dclose_f( tdse_dat_id, h5_err)
   
   call h5gopen_f(param_file_id, "operators", operators_group_id, h5_err)
-  
   call h5dopen_f(operators_group_id, "mat_type", operators_dat_id, h5_err)
-  
   call h5dread_f(operators_dat_id, memtype, tmp_character,dims, h5_err)
-  
   call h5dclose_f( operators_dat_id, h5_err)
+  
   if (trim(tmp_character) .eq. "MATSBAIJ") then
     mat_type = MATSBAIJ
   else if (trim(tmp_character) .eq. "MATAIJ") then
@@ -361,6 +359,8 @@ use ifport
   deallocate(shift_l)
   deallocate(shift_n)
   deallocate(shift_m)
+  deallocate(energy_shift)
+
   call MatDestroy(H0,ierr)
   CHKERRA(ierr)
   call h5fclose_f( file_id, h5_err)

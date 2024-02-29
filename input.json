@@ -49,14 +49,14 @@
     "operators": {
         "local": 1,
         "compute": 1,
-        "radiation": 0,
+        "radiation": 1,
         "ignore_couplings": 1,
         "energy_truncation": 0.0,
-        "location": "bhahdafsdfsd",
+        "location": "null",
         "mat_type": "MATSBAIJ"
     },
     "EPS": {
-        "l_max": 11,
+        "l_max": 5,
         "EPSSetBalance": "EPS_BALANCE_NONE",
         "cap_present": 0,
         "rot_present": 1,
@@ -65,7 +65,7 @@
         "cap_eta": 0.5,
         "abs_tol": 1e-10,
         "label": "H",
-        "location": "blah",
+        "location": "null",
         "n_max": 50,
         "local": 1,
         "mpd": -1,
@@ -115,17 +115,17 @@
         "num_shift": 0
     },
     "mpi": {
-        "np": 21,
-        "host": "asd",
+        "np": 6,
+        "host": "null",
         "assign_host": 0
     },
     "TDSE": {
-        "l_max": 11,
+        "l_max": 5,
         "mask_l_abs": 1000,
         "delta_t": 0.01,
         "mask_n_abs": 1000,
         "mask_present": 0,
-        "propagate": 0,
+        "propagate": 1,
         "mask_type": "cosine",
         "m_max": 0,
         "n_max": 50,

@@ -168,8 +168,8 @@ use iso_c_binding
   integer(HSIZE_T)    :: dims(1), dims2(2)
   PetscReal           :: dt
   PetscReal           :: maxtime
-  character(len=15)   :: mask
-  character(len = 15) :: label ! File name without .h5 extension
+  character(len=300)   :: mask
+  character(len = 300):: label ! File name without .h5 extension
   external            :: RHSMatrixSchrodinger
   PetscReal           :: start_time, end_time, normal_vec(3), perp_vec(3)
   integer(HID_T)      :: param_file_id, pulse_dat_id, pulse_group_id
@@ -219,6 +219,8 @@ use iso_c_binding
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, lmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
 
+  print*, "LMAX = ", lmax
+
   call h5dopen_f(tdse_group_id, "m_max", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, H5T_NATIVE_INTEGER, mmax, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
@@ -245,13 +247,18 @@ use iso_c_binding
 
   call h5gopen_f(param_file_id, "EPS", eps_group_id, h5_err)
 
+  print*, "LMAX = ", lmax
 
   call H5Tcopy_f(H5T_FORTRAN_S1, memtype, h5_err)
   call H5Tset_size_f(memtype, sdim, h5_err)
 
+  print*, "LMAX", lmax
+
   call h5dopen_f(tdse_group_id, "mask_type", tdse_dat_id, h5_err)
   call h5dread_f(tdse_dat_id, memtype, mask, dims, h5_err)
   call h5dclose_f( tdse_dat_id, h5_err)
+
+  print*, "LMAX", lmax
 
   call h5dopen_f(eps_group_id, "label", eps_dat_id, h5_err)
   call h5dread_f(eps_dat_id, memtype, label, dims, h5_err)
@@ -296,6 +303,9 @@ use iso_c_binding
   ! Total dim of the hilbert space for this problem.
   size = indicies(nmax,lmax,mmax,nmax,mmax) + 1   
 
+  print*, "nmax, lmax, mmax", nmax, lmax, mmax
+  print*, "SIZE = ", size
+
   ! These are the default values in atomic units the user is free to change 
   ! them as an extra argument when running the program 
   dims(1) = 1
@@ -333,8 +343,6 @@ use iso_c_binding
   call h5dread_f(operators_dat_id, H5T_NATIVE_INTEGER, compute_rad, dims,h5_err)
   call h5dclose_f(operators_dat_id, h5_err)
 
-
-
   call h5gopen_f(param_file_id, "laser", laser_group_id, h5_err)
   
   call h5dopen_f(laser_group_id, "E_length", laser_dat_id, h5_err)
@@ -351,7 +359,6 @@ use iso_c_binding
   call h5dclose_f( laser_dat_id, h5_err)
    
   E = dcmplx(EE,0d0)
-
 
   dims(1) = 3
   
@@ -374,8 +381,6 @@ use iso_c_binding
   end do 
 
   dims(1) = 1
-
-
 
 ! --------------------------------------------------------------------------
 ! Create Z_scale matrix
@@ -411,6 +416,7 @@ if (zero_dir .ne. 3 .or. mmax .eq. 0) then
   call PetscViewerDestroy(viewer,ierr)
   CHKERRA(ierr)
 end if 
+
 ! --------------------------------------------------------------------------
 ! Create Y_scale matrix
 ! --------------------------------------------------------------------------
